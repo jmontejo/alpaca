@@ -1,0 +1,206 @@
+#!/usr/bin/env python
+
+import logging
+log = logging.getLogger('alpaca')
+log.setLevel(logging.DEBUG)
+fh = logging.FileHandler('alpaca.log')
+fh.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+ff = logging.Formatter('[%(asctime)s] %(levelname)s :: %(message)s')
+cf = logging.Formatter('[%(levelname)s] %(message)s')
+fh.setFormatter(ff)
+ch.setFormatter(cf)
+log.addHandler(fh)
+log.addHandler(ch)
+
+from pathlib import Path
+import datetime
+
+import uproot
+import uproot_methods
+import awkward
+import numpy as np
+import matplotlib.pyplot as plt
+import torch
+
+from progressbar import progressbar
+
+from alpaca.colalola import CoLaLoLa
+
+
+class BatchManager:
+
+    def __init__(self, sig_path, bkg_path):
+        self._sig_lv = self.get_lorentz_vectors(sig_path)
+        self._bkg_lv = self.get_lorentz_vectors(bkg_path)
+        log.info('Nr. of signal events: %s', len(self._sig_lv))
+        log.info('Nr. of background events: %s', len(self._bkg_lv))
+ 
+    @staticmethod
+    def get_lorentz_vectors(file_path):
+        """
+        The returned object looks like this:
+        
+        [[[event 1 jet 1 t, event 1 jet 1 x, event 1 jet 1 y, event 1 jet 1 z]
+          [event 1 jet 2 t, event 1 jet 2 x, event 1 jet 2 y, event 1 jet 2 z]
+          [event 1 jet 3 t, event 1 jet 3 x, event 1 jet 3 y, event 1 jet 3 z]
+          [event 1 jet 4 t, event 1 jet 4 x, event 1 jet 4 y, event 1 jet 4 z]
+          [event 1 jet 5 t, event 1 jet 5 x, event 1 jet 5 y, event 1 jet 5 z]
+          [event 1 jet 6 t, event 1 jet 6 x, event 1 jet 6 y, event 1 jet 6 z]]
+          [[event 2 jet 1 t, event 2 jet 1 x, event 2 jet 1 y, event 1 jet 1 z]
+          [event 2 jet 2 t, event 2 jet 2 x, event 2 jet 2 y, event 1 jet 2 z]
+           ...
+
+        basically they are separated by events. For each event they are
+        separated by jet: jet 1, jet 2, etc. And for each jet the four elements
+        are the four coordinates of the TLorentz vector: t, x, y, z.
+        """
+        nominal = uproot.open(str(file_path))['nominal']
+        arrays = nominal.arrays(
+            ['reco_bjets', 'jet_pt', 'jet_eta', 'jet_phi', 'jet_e', 'jet_n',
+             'reco_index_w[12]j[ab]', 'reco_index_b[12]',
+             'reco_Chi2Fitted', 'reco_DRbWMax', 'reco_DRbb',
+             'reco_t[12]_m'],
+            namedecode='ascii'
+        )
+
+        table = awkward.Table(
+            pt=awkward.fromiter(arrays['jet_pt']),
+            eta=awkward.fromiter(arrays['jet_eta']),
+            phi=awkward.fromiter(arrays['jet_phi']),
+            e=awkward.fromiter(arrays['jet_e'])
+        )
+
+        lor_vec = uproot_methods.TLorentzVectorArray.from_ptetaphi(
+            table.pt,
+            table.eta,
+            table.phi,
+            table.e
+        )
+
+        lor_vec_stack = np.stack(
+            [lor_vec.t.regular(),
+             lor_vec.x.regular(),
+             lor_vec.y.regular(),
+             lor_vec.z.regular()],
+            axis=-1
+        )
+
+        return lor_vec_stack
+
+    def get_torch_batch(self, N, start_index=0):
+        stop_index = start_index + N
+        if stop_index > min(len(self._sig_lv), len(self._bkg_lv)):
+            log.warning('Stop index too big')
+        lv = np.concatenate([self._sig_lv[start_index:stop_index],
+                             self._bkg_lv[start_index:stop_index]])
+        scores = np.concatenate([np.ones(N), np.zeros(N)])
+
+        X = torch.as_tensor(lv, dtype=torch.float)
+        Y = torch.as_tensor(scores, dtype=torch.float)
+        return X, Y
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='ML top-like tagger.')
+    parser.add_argument('--bkg', required=True, type=Path,
+                        help='path to the file with bkg events')
+    parser.add_argument('--sig', required=True, type=Path,
+                        help='path to the file with sig events')
+    parser.add_argument('--tag', action='store_true',
+                        help='tag the output')
+    args = parser.parse_args()
+
+
+    output_dir = Path('data')
+    if args.tag:
+        now = datetime.datetime.now()
+        output_dir = output_dir / '{:%Y%m%d_%H%M%S}'.format(now)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        nfh = logging.FileHandler(str(output_dir / 'alpaca.log'))
+        nfh.setLevel(logging.DEBUG)
+        nfh.setFormatter(ff)
+        log.addHandler(nfh)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    log.debug('Signal input: %s', args.sig)
+    log.debug('Background input: %s', args.bkg)
+    bm = BatchManager(sig_path=args.sig, bkg_path=args.bkg)
+
+    model = CoLaLoLa(6, 30)
+    opt = torch.optim.Adam(model.parameters())
+    losses = []
+
+    nr_train = 300
+    batch_size = 150
+    log.debug('Training itearations: %s', nr_train)
+    log.debug('Batch size (for each itearation): %s', batch_size)
+    for i in progressbar(range(nr_train)):
+        model.train()
+        opt.zero_grad()
+
+        X, Y = bm.get_torch_batch(batch_size, start_index=i * batch_size)
+        P = model(X)
+        P, Y = P, Y.reshape(-1, 1)
+
+        loss = torch.nn.functional.binary_cross_entropy(P, Y)
+        losses.append(float(loss))
+        #if i % 25 == 0:
+        #    print(loss)
+        #    #plt.plot(losses)
+        #    #plt.show()
+        loss.backward()
+        opt.step()
+
+    log.debug('Finished training')
+    fig = plt.figure()
+    plt.plot(losses)
+    plt.savefig(str(output_dir / 'losses.png'))
+
+    log.info('Save plot model')
+    fig = plt.figure()
+    plt.imshow(model.cola.w_combo.data.numpy())
+    plt.savefig(str(output_dir / 'w_combo.png'))
+
+    log.info('Make torch batch')
+    X,Y = bm.get_torch_batch(5000, nr_train * batch_size)
+    P = model(X)
+    _P = P.data.numpy()
+    _Y = Y.data.numpy()
+
+    log.info('Plot Histograms')
+    fig = plt.figure()
+    plt.hist(_P[_Y==0],
+             bins = np.linspace(0, 1, 51),
+             label='bkg',
+             density=True,
+             histtype='step')
+    plt.hist(_P[_Y==1],
+             bins = np.linspace(0, 1, 51),
+             density=True,
+             label='sig',
+             histtype='step')
+    #plt.semilogy()
+    plt.legend()
+    plt.savefig(str(output_dir / 'score.png'))
+
+    w = model.cola.w_combo.data.numpy()
+
+    fig = plt.figure()
+    plt.hist(X.data.numpy()[Y==0, :, 1].ravel(), bins=100)
+
+    plt.savefig(str(output_dir / 'ravel.png'))
+
+    X.data.numpy()[Y==0, :, 1]
+
+    #log.info('Make torch batch')
+    #X, Y = bm.get_torch_batch(500, nr_train * batch_size)
+    #np.unique(X[Y==1].data.numpy()[:, :, 0].ravel()).shape
+    #fig = plt.figure()
+    #_,b,_ = plt.hist(X[Y==1].data.numpy()[:, :, 0].ravel(),bins=100);
+    #plt.hist(X[Y==0].data.numpy()[:, :, 0].ravel(),bins=b);
+    #plt.savefig('data/ravel_2.png')
