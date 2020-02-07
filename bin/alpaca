@@ -92,7 +92,7 @@ class BatchManager:
     def get_torch_batch(self, N, start_index=0):
         stop_index = start_index + N
         if stop_index > min(len(self._sig_lv), len(self._bkg_lv)):
-            log.warning('Stop index too big')
+            log.warning('The stop index is grater than the size of the array')
         lv = np.concatenate([self._sig_lv[start_index:stop_index],
                              self._bkg_lv[start_index:stop_index]])
         scores = np.concatenate([np.ones(N), np.zeros(N)])
@@ -109,15 +109,19 @@ if __name__ == '__main__':
                         help='path to the file with bkg events')
     parser.add_argument('--sig', required=True, type=Path,
                         help='path to the file with sig events')
-    parser.add_argument('--tag', action='store_true',
+    parser.add_argument('--tag', nargs='?', const='',
                         help='tag the output')
     args = parser.parse_args()
 
 
     output_dir = Path('data')
-    if args.tag:
+    if args.tag is not None:
         now = datetime.datetime.now()
-        output_dir = output_dir / '{:%Y%m%d_%H%M%S}'.format(now)
+        if args.tag:
+            new_dir_name = '{:%Y%m%d_%H%M%S}_{}'.format(now, args.tag)
+        else:
+            new_dir_name = '{:%Y%m%d_%H%M%S}'.format(now)
+        output_dir = output_dir / new_dir_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
         nfh = logging.FileHandler(str(output_dir / 'alpaca.log'))
@@ -131,14 +135,17 @@ if __name__ == '__main__':
     log.debug('Background input: %s', args.bkg)
     bm = BatchManager(sig_path=args.sig, bkg_path=args.bkg)
 
-    model = CoLaLoLa(6, 30)
+
+    nobjects = 6
+    ncombos = 30
+    log.debug('CoLaLoLa: nr. jets %s - nr. combos %s', nobjects, ncombos)
+    model = CoLaLoLa(nobjects, ncombos)
     opt = torch.optim.Adam(model.parameters())
     losses = []
 
-    nr_train = 300
-    batch_size = 150
-    log.debug('Training itearations: %s', nr_train)
-    log.debug('Batch size (for each itearation): %s', batch_size)
+    nr_train = 190
+    batch_size = 350
+    log.debug('Training: %s iterations - batch size %s', nr_train, batch_size)
     for i in progressbar(range(nr_train)):
         model.train()
         opt.zero_grad()
