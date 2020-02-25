@@ -23,7 +23,7 @@ import awkward
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-
+from sklearn.metrics import roc_curve, auc
 from progressbar import progressbar
 
 from alpaca.colalola import CoLaLoLa
@@ -109,12 +109,18 @@ if __name__ == '__main__':
                         help='path to the file with bkg events')
     parser.add_argument('--sig', required=True, type=Path,
                         help='path to the file with sig events')
+    parser.add_argument('--quick-test', action='store_true',
+                        help='set params for a quick test')
+    parser.add_argument('--output-dir', type=Path, default=Path('data'),
+                        help='path to the output directory')
     parser.add_argument('--tag', nargs='?', const='',
                         help='tag the output')
     args = parser.parse_args()
 
+    if args.quick_test:
+        args.tag = 'test'
 
-    output_dir = Path('data')
+    output_dir = args.output_dir
     if args.tag is not None:
         now = datetime.datetime.now()
         if args.tag:
@@ -135,7 +141,6 @@ if __name__ == '__main__':
     log.debug('Background input: %s', args.bkg)
     bm = BatchManager(sig_path=args.sig, bkg_path=args.bkg)
 
-
     nobjects = 6
     ncombos = 30
     log.debug('CoLaLoLa: nr. jets %s - nr. combos %s', nobjects, ncombos)
@@ -145,6 +150,9 @@ if __name__ == '__main__':
 
     nr_train = 190
     batch_size = 350
+    if args.quick_test:
+        nr_train = 5
+        batch_size = 500
     log.debug('Training: %s iterations - batch size %s', nr_train, batch_size)
     for i in progressbar(range(nr_train)):
         model.train()
@@ -182,12 +190,12 @@ if __name__ == '__main__':
     log.info('Plot Histograms')
     fig = plt.figure()
     plt.hist(_P[_Y==0],
-             bins = np.linspace(0, 1, 51),
+             bins = np.linspace(0, 1, 510),
              label='bkg',
              density=True,
              histtype='step')
     plt.hist(_P[_Y==1],
-             bins = np.linspace(0, 1, 51),
+             bins = np.linspace(0, 1, 510),
              density=True,
              label='sig',
              histtype='step')
@@ -195,8 +203,27 @@ if __name__ == '__main__':
     plt.legend()
     plt.savefig(str(output_dir / 'score.png'))
 
-    w = model.cola.w_combo.data.numpy()
+    log.info('Plot ROC curve')
+    fpr, tpr, thr = roc_curve(_Y, _P)
+    roc_auc = auc(fpr, tpr)
+    print(len(fpr))
+    print(max(fpr))
+    print(fpr[-10:])
+    print(len(_P))
 
+    fig = plt.figure()
+    plt.plot(fpr, tpr, color='darkorange',
+             label='ROC curve (area = {:.2f})'.format(roc_auc))
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    #plt.title('Receiver operating characteristic')
+    plt.legend(loc="lower right")
+    plt.savefig(str(output_dir / 'roc_curve.png'))
+
+    w = model.cola.w_combo.data.numpy()
     fig = plt.figure()
     plt.hist(X.data.numpy()[Y==0, :, 1].ravel(), bins=100)
 
