@@ -159,7 +159,7 @@ if __name__ == '__main__':
         opt.zero_grad()
 
         X, Y = bm.get_torch_batch(batch_size, start_index=i * batch_size)
-        P = model(X)
+        P, masses = model(X)
         P, Y = P, Y.reshape(-1, 1)
 
         loss = torch.nn.functional.binary_cross_entropy(P, Y)
@@ -183,9 +183,51 @@ if __name__ == '__main__':
 
     log.info('Make torch batch')
     X,Y = bm.get_torch_batch(5000, nr_train * batch_size)
-    P = model(X)
+    P, masses_sig = model(X)
     _P = P.data.numpy()
     _Y = Y.data.numpy()
+
+    #X,Y = bm.get_torch_batch(5000, nr_train * batch_size)
+    #X, Y = X[:5000], Y[:5000]
+    #P, masses_bkg = model(X)
+    #_P = P.data.numpy()
+    #_Y = Y.data.numpy()
+
+    #log.info('Plot mass histogram')
+    #fig = plt.figure()
+
+    #bins = np.linspace(0, 6000, 50)
+    #plt.hist(np.sqrt(np.abs(masses_bkg)) / 1000., bins=bins, histtype='step',
+    #         label='bkg')
+    #plt.hist(np.sqrt(np.abs(masses_sig)) / 1000., bins=bins, histtype='step',
+    #         label='signal')
+    #plt.yscale('log')
+    #plt.xscale('log')
+    #plt.xlabel('Mass [GeV]')
+    #plt.legend()
+    #plt.savefig(str(output_dir / 'masses.png'))
+
+    log.info('Feature Histogram')
+    _X = X.data.numpy()
+    pts = []
+    for i, score in enumerate(P):
+        if score > -1:
+            jets_lv = []
+            for jet_coo in _X[i]:
+                lv = uproot_methods.TLorentzVector(x=jet_coo[1],
+                                                   y=jet_coo[2],
+                                                   z=jet_coo[3],
+                                                   t=jet_coo[0])
+                jets_lv.append(lv)
+            jets_lv.sort(key=lambda x: x.pt, reverse=True)
+            pts.append(jets_lv[0].pt / 1000.)
+
+    fig = plt.figure()
+    plt.hist(pts, bins=1000, label='score > -1')
+    plt.xlabel('Leading Jet PT [GeV]')
+    plt.legend()
+    plt.savefig(str(output_dir / 'leading_pt.png'))
+
 
     log.info('Plot Histograms')
     fig = plt.figure()
@@ -206,10 +248,10 @@ if __name__ == '__main__':
     log.info('Plot ROC curve')
     fpr, tpr, thr = roc_curve(_Y, _P)
     roc_auc = auc(fpr, tpr)
-    print(len(fpr))
-    print(max(fpr))
-    print(fpr[-10:])
-    print(len(_P))
+    #print(len(fpr))
+    #print(max(fpr))
+    #print(fpr[-10:])
+    #print(len(_P))
 
     fig = plt.figure()
     plt.plot(fpr, tpr, color='darkorange',

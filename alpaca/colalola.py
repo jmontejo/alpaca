@@ -44,7 +44,7 @@ class LoLa(torch.nn.Module):
             weighted_d,
             weighted_p,
         ], dim=-1)
-        return outputs
+        return outputs, masses.flatten().detach().numpy()
 
 
 class FeedForwardHead(torch.nn.Module):
@@ -74,9 +74,9 @@ class CoLaLoLa(torch.nn.Module):
         
     def forward(self,vectors):
         output = self.cola(vectors)
-        output = self.lola(output)
+        output, masses = self.lola(output)
         output = output.reshape(output.shape[0], -1)
         output = self.norm(output)
         output = self.head(output)
-        return output
+        return output, masses
 
