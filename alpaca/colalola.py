@@ -12,7 +12,7 @@ class CoLa(torch.nn.Module):
 
     def forward(self,vectors):
         combo = torch.cat([self.identity, self.w_combo], dim=0)
-        combvec = torch.einsum('ij,bjk->bik', combo, vectors)    
+        combvec = torch.einsum('ij,bjk->bik', combo, vectors)
         return combvec
 
 
@@ -28,11 +28,11 @@ class LoLa(torch.nn.Module):
     def forward(self, combvec):
         weighted_e = torch.einsum('ij,bj->bi', self.w_ener,combvec[:, :, 0])
         weighted_p = torch.einsum('ij,bj->bi', self.w_pid,combvec[:, :, -1])
- 
+
         a = combvec[...,:4].unsqueeze(2).repeat(1, 1, self.outputobj, 1)
         b = combvec[...,:4].unsqueeze(1).repeat(1, self.outputobj, 1, 1)
         diff = (a - b)
-        
+
         distances = torch.einsum('bnmi,ij,bnmj->bnm', diff, self.metric, diff)
         weighted_d = torch.einsum('nm,bnm->bn', self.w_dist, distances)
         masses = torch.einsum('bni,ij,bnj->bn', combvec[..., :4], self.metric, combvec[...,:4])
@@ -71,7 +71,7 @@ class CoLaLoLa(torch.nn.Module):
         self.lola = LoLa(self.ntotal)
         self.norm = torch.nn.BatchNorm1d(self.ntotal * 5)
         self.head = FeedForwardHead([self.ntotal * 5, 200, 1])
-        
+
     def forward(self,vectors):
         output = self.cola(vectors)
         output = self.lola(output)
@@ -79,4 +79,3 @@ class CoLaLoLa(torch.nn.Module):
         output = self.norm(output)
         output = self.head(output)
         return output
-
