@@ -64,13 +64,13 @@ class FeedForwardHead(torch.nn.Module):
 
 
 class CoLaLoLa(torch.nn.Module):
-    def __init__(self, nobjects, ncombos):
+    def __init__(self, nobjects, ncombos, noutputs):
         super(CoLaLoLa, self).__init__()
         self.ntotal = nobjects + ncombos
         self.cola = CoLa(nobjects, ncombos)
         self.lola = LoLa(self.ntotal)
         self.norm = torch.nn.BatchNorm1d(self.ntotal * 5)
-        self.head = FeedForwardHead([self.ntotal * 5, 200, 1])
+        self.head = FeedForwardHead([self.ntotal * 5, 100, 20, noutputs])
 
     def forward(self,vectors):
         output = self.cola(vectors)

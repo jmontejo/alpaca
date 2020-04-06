@@ -29,12 +29,12 @@ from alpaca.colalola import CoLaLoLa
 
 class BatchManager:
 
-    def __init__(self, sig_path):
-        self._labeledjets = self.get_jets(sig_path)
+    def __init__(self, sig_path, shuffle_jets=False, shuffle_events=False):
+        self._labeledjets = self.get_jets(sig_path, shuffle_jets, shuffle_events)
         log.info('Nr. of signal events: %s', len(self._labeledjets))
 
     @staticmethod
-    def get_jets(file_path):
+    def get_jets(file_path,shuffle_jets=False,shuffle_events=False):
         """
         The returned object looks like this:
 
@@ -48,29 +48,45 @@ class BatchManager:
 
         basically they are separated by events. For each event they are
         separated by jet: jet 1, jet 2, etc. And for each jet the five elements
-        are the four coordinates of the TLorentz vector: t, x, y, z.
-        The jets are zero-padded up to 10
+        are the four coordinates of the TLorentz vector: t, x, y, z; plus a
+        truth-based parton label (0=not top jet, 1-3 = b,Wa,Wb from top, 4-6
+        ditto from antitop).
+        The jets are zero-padded up to the 10th and pT-ordered.
         """
 
         df = pd.read_hdf(file_path,"df")
+        if shuffle_events:
+            df.reindex(np.random.permutation(df.index))
         nevents = len(df)
         # The input rows have all jet px, all jet py, ... all jet partonindex
         # So segment and swap axes to group by jet
         jet_stack = np.swapaxes(df.values.reshape(nevents,5,10),1,2)
-
+        if shuffle_jets:
+            # shuffle only does the outermost level
+            # iterate through rows to shuffle each event individually
+            for row in jet_stack:
+                np.random.shuffle(row)
         return jet_stack
 
-    def get_torch_batch(self, N, start_index=0):
+    def get_torch_batch(self, N, nlabels, start_index=0):
         stop_index = start_index + N
         if stop_index > len(self._labeledjets):
-            log.warning('The stop index is grater than the size of the array')
+            log.warning('The stop index is greater than the size of the array')
         jets = self._labeledjets[start_index:stop_index,:,:4]
-        labels = self._labeledjets[start_index:stop_index,:,-1:]/6
-        leadinglabel = labels[:,0]
-        leadingfromtop = leadinglabel>0
+        labels = self._labeledjets[start_index:stop_index,:nlabels,-1:]
+        # is the jet from the ttbar system?
+        jetfromttbar = labels > 0
+        # is the jet associated with the top quark?
+        # Disregard the jets that are from ISR
+        # Account for charge ambiguity by identifying whether the
+        # jets match the leading jet or not
+        maskedlabels = np.ma.masked_where(jetfromttbar==False,labels)
+        nonisrlabels = np.array([r.compressed() for r in maskedlabels])
+        topmatch = np.array( [ r>3 if r[0]>3 else r<3 for r in nonisrlabels] )
+        jetlabels = np.concatenate([jetfromttbar.squeeze(),topmatch],1)
 
         X = torch.as_tensor(jets, dtype=torch.float)
-        Y = torch.as_tensor(leadingfromtop, dtype=torch.float)
+        Y = torch.as_tensor(jetlabels, dtype=torch.float)
         return X, Y
 
 
@@ -85,6 +101,10 @@ if __name__ == '__main__':
                         help='path to the output directory')
     parser.add_argument('--tag', nargs='?', const='',
                         help='tag the output')
+    parser.add_argument('--shuffle-jets', action='store_true',
+                        help='reorder jets in each event')
+    parser.add_argument('--shuffle-events', action='store_true',
+                        help='reorder events in the dataset')
     args = parser.parse_args()
 
     if args.quick_test:
@@ -94,7 +114,7 @@ if __name__ == '__main__':
     if args.tag is not None:
         now = datetime.datetime.now()
         if args.tag:
-            new_dir_name = '{:%Y%m%d_%H%M%S}_{}'.format(now, args.tag)
+            new_dir_name = args.tag
         else:
             new_dir_name = '{:%Y%m%d_%H%M%S}'.format(now)
         output_dir = output_dir / new_dir_name
@@ -108,29 +128,32 @@ if __name__ == '__main__':
     output_dir.mkdir(parents=True, exist_ok=True)
 
     log.debug('Signal input: %s', args.sig)
-    bm = BatchManager(sig_path=args.sig)
+    bm = BatchManager(sig_path=args.sig, shuffle_jets=args.shuffle_jets, shuffle_events=args.shuffle_events)
 
     nobjects = 10
     ncombos = 30
+    njets = 10
+    ntomatch = 6
+    noutputs = njets + ntomatch
     log.debug('CoLaLoLa: nr. jets %s - nr. combos %s', nobjects, ncombos)
-    model = CoLaLoLa(nobjects, ncombos)
+    model = CoLaLoLa(nobjects, ncombos, noutputs)
     opt = torch.optim.Adam(model.parameters())
     losses = []
 
-    nr_train = 5
+    nr_train = 500
     batch_size = 500
     # No stats right now
-    # if args.quick_test:
-    #     nr_train = 5
-    #     batch_size = 500
+    if args.quick_test:
+        nr_train = 100
+        batch_size = 100
     log.debug('Training: %s iterations - batch size %s', nr_train, batch_size)
     for i in progressbar(range(nr_train)):
         model.train()
         opt.zero_grad()
 
-        X, Y = bm.get_torch_batch(batch_size, start_index=i * batch_size)
+        X, Y = bm.get_torch_batch(batch_size, nlabels=noutputs, start_index=i * batch_size)
         P = model(X)
-        P, Y = P, Y.reshape(-1, 1)
+        P, Y = P, Y.reshape(-1, noutputs)
 
         loss = torch.nn.functional.binary_cross_entropy(P, Y)
         losses.append(float(loss))
@@ -152,47 +175,83 @@ if __name__ == '__main__':
     plt.savefig(str(output_dir / 'w_combo.png'))
 
     log.info('Make torch batch')
-    X,Y = bm.get_torch_batch(2500, nr_train * batch_size)
+    X,Y = bm.get_torch_batch(50000, nr_train * batch_size)
     P = model(X)
 
     _P = P.data.numpy()
-    _Y = Y.data.numpy()
+    _Y = Y.data.numpy().squeeze()
 
-    log.info('Plot Histograms')
-    fig = plt.figure()
-    plt.hist(_P[_Y==0],
-             bins = np.linspace(0, 1, 50),
-             label='ISR jet',
-             density=True,
-             histtype='step')
-    plt.hist(_P[_Y==1],
-             bins = np.linspace(0, 1, 50),
-             label='Top jet',
-             density=True,
-             histtype='step')
-    #plt.semilogy()
-    plt.legend()
-    plt.savefig(str(output_dir / 'score.png'))
+    log.info('Plot Histograms and ROC curves for ISR-tagging')
+    for ijet in range(njets):
+        _Pjet = _P[:,ijet]
+        _Yjet = _Y[:,ijet]
+        fig = plt.figure()
+        plt.hist(_Pjet[_Yjet==0],
+                 bins = np.linspace(0, 1, 50),
+                 label='ISR jet',
+                 density=True,
+                 histtype='step')
+        plt.hist(_Pjet[_Yjet==1],
+                 bins = np.linspace(0, 1, 50),
+                 label='Top jet',
+                 density=True,
+                 histtype='step')
+        #plt.semilogy()
+        plt.legend()
+        plt.savefig(str(output_dir / 'score_ISR_jet{}.png'.format(ijet)))
+        plt.close()
 
-    log.info('Plot ROC curve')
-    fpr, tpr, thr = roc_curve(_Y, _P)
-    roc_auc = auc(fpr, tpr)
-    print(len(fpr))
-    print(max(fpr))
-    print(fpr[-10:])
-    print(len(_P))
+        fpr, tpr, thr = roc_curve(_Yjet, _Pjet)
+        roc_auc = auc(fpr, tpr)
 
-    fig = plt.figure()
-    plt.plot(fpr, tpr, color='darkorange',
-             label='ROC curve (area = {:.2f})'.format(roc_auc))
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    #plt.title('Receiver operating characteristic')
-    plt.legend(loc="lower right")
-    plt.savefig(str(output_dir / 'roc_curve.png'))
+        fig = plt.figure()
+        plt.plot(fpr, tpr, color='darkorange',
+                 label='ROC curve (area = {:.2f})'.format(roc_auc))
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        #plt.title('Receiver operating characteristic')
+        plt.legend(loc="lower right")
+        plt.savefig(str(output_dir / 'roc_curve_ISR_jet{}.png'.format(ijet)))
+        plt.close()
+
+    log.info('Plot Histograms and ROC curves for top/tbar matching')
+    for ijet in range(ntomatch):
+        _Pjet = _P[:,ijet+10]
+        _Yjet = _Y[:,ijet+10]
+        fig = plt.figure()
+        plt.hist(_Pjet[_Yjet==0],
+                 bins = np.linspace(0, 1, 50),
+                 label='Top jet',
+                 density=True,
+                 histtype='step')
+        plt.hist(_Pjet[_Yjet==1],
+                 bins = np.linspace(0, 1, 50),
+                 label='Antitop jet',
+                 density=True,
+                 histtype='step')
+        #plt.semilogy()
+        plt.legend()
+        plt.savefig(str(output_dir / 'score_ttbar_jet{}.png'.format(ijet)))
+        plt.close()
+
+        fpr, tpr, thr = roc_curve(_Yjet, _Pjet)
+        roc_auc = auc(fpr, tpr)
+
+        fig = plt.figure()
+        plt.plot(fpr, tpr, color='darkorange',
+                 label='ROC curve (area = {:.2f})'.format(roc_auc))
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        #plt.title('Receiver operating characteristic')
+        plt.legend(loc="lower right")
+        plt.savefig(str(output_dir / 'roc_curve_ttbar_jet{}.png'.format(ijet)))
+        plt.close()
 
     # w = model.cola.w_combo.data.numpy()
     # fig = plt.figure()
