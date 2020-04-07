@@ -70,7 +70,7 @@ class CoLaLoLa(torch.nn.Module):
         self.cola = CoLa(nobjects, ncombos)
         self.lola = LoLa(self.ntotal)
         self.norm = torch.nn.BatchNorm1d(self.ntotal * 5)
-        self.head = FeedForwardHead([self.ntotal * 5, 100, 20, noutputs])
+        self.head = FeedForwardHead([self.ntotal * 5, 200, noutputs])
 
     def forward(self,vectors):
         output = self.cola(vectors)
