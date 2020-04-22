@@ -25,16 +25,17 @@ from sklearn.metrics import roc_curve, auc
 from progressbar import progressbar
 
 from alpaca.colalola import CoLaLoLa
+from alpaca.simple import SimpleNN
 
 
 class BatchManager:
 
-    def __init__(self, sig_path, shuffle_jets=False, shuffle_events=False):
-        self._labeledjets = self.get_jets(sig_path, shuffle_jets, shuffle_events)
+    def __init__(self, sig_path, shuffle_jets=False, shuffle_events=False, zero_jets=0, jets_per_event=10):
+        self._labeledjets = self.get_jets(sig_path, shuffle_jets, shuffle_events, zero_jets, jets_per_event)
         log.info('Nr. of signal events: %s', len(self._labeledjets))
 
     @staticmethod
-    def get_jets(file_path,shuffle_jets=False,shuffle_events=False):
+    def get_jets(file_path,shuffle_jets=False,shuffle_events=False, zero_jets=0, jets_per_event=10):
         """
         The returned object looks like this:
 
@@ -55,12 +56,18 @@ class BatchManager:
         """
 
         df = pd.read_hdf(file_path,"df")
+        # These next lines can be used to filter out some events, e.g. to
+        # limit the training & evaluation to N>6 leading jets
+        leadingNcontaintop = df[[("partonindex",i) for i in range(10-zero_jets,10)]].sum(axis=1) == 0
+        df = df[leadingNcontaintop]
+        #
         if shuffle_events:
             df.reindex(np.random.permutation(df.index))
         nevents = len(df)
         # The input rows have all jet px, all jet py, ... all jet partonindex
         # So segment and swap axes to group by jet
         jet_stack = np.swapaxes(df.values.reshape(nevents,5,10),1,2)
+        jet_stack = jet_stack[:,:jets_per_event,:]
         if shuffle_jets:
             # shuffle only does the outermost level
             # iterate through rows to shuffle each event individually
@@ -83,7 +90,12 @@ class BatchManager:
         maskedlabels = np.ma.masked_where(jetfromttbar==False,labels)
         nonisrlabels = np.array([r.compressed() for r in maskedlabels])
         topmatch = np.array( [ r>3 if r[0]>3 else r<3 for r in nonisrlabels] )
-        jetlabels = np.concatenate([jetfromttbar.squeeze(),topmatch],1)
+        isbjet = np.array( [ np.equal(r,1) | np.equal(r,4) for r in nonisrlabels] )
+        jetlabels = np.concatenate([jetfromttbar.squeeze(),topmatch[:,1:],isbjet],1)
+        # Substitute this line for the preceding if only doing the 6 top jets
+        # topmatch = np.array( [ r>3 if r[0]>3 else r<3 for r in labels] )
+        # isbjet = np.array( [ np.equal(r,1) | np.equal(r,4) for r in labels] )
+        # jetlabels = np.concatenate([jetfromttbar.squeeze(),topmatch[:,1:],isbjet],1)
 
         X = torch.as_tensor(jets, dtype=torch.float)
         Y = torch.as_tensor(jetlabels, dtype=torch.float)
@@ -99,49 +111,66 @@ if __name__ == '__main__':
                         help='set params for a quick test')
     parser.add_argument('--output-dir', type=Path, default=Path('data'),
                         help='path to the output directory')
-    parser.add_argument('--tag', nargs='?', const='',
+    parser.add_argument('--tag', default='alpaca',
                         help='tag the output')
     parser.add_argument('--shuffle-jets', action='store_true',
                         help='reorder jets in each event')
     parser.add_argument('--shuffle-events', action='store_true',
                         help='reorder events in the dataset')
+    parser.add_argument('--simple-nn', action='store_true',
+                        help='substitute a simple feed-forward NN for colalola')
+    parser.add_argument("--fflayers", nargs="+", type=int, default=[200])
+    parser.add_argument("--ncombos", type=int, default=30)
     args = parser.parse_args()
 
     if args.quick_test:
         args.tag = 'test'
 
+    # Autogenerate meaningful names for output dir
     output_dir = args.output_dir
-    if args.tag is not None:
-        now = datetime.datetime.now()
-        if args.tag:
-            new_dir_name = args.tag
-        else:
-            new_dir_name = '{:%Y%m%d_%H%M%S}'.format(now)
-        output_dir = output_dir / new_dir_name
-        output_dir.mkdir(parents=True, exist_ok=True)
+    new_dir_name = args.tag
+    if args.shuffle_jets:
+        new_dir_name += "_shuffled"
+    else:
+        new_dir_name += "_ptordered"
+    if args.simple_nn:
+        new_dir_name += "_simplenn"
+    else:
+        new_dir_name += "_{}combos".format(args.ncombos)
+    layerstr = '_'.join([str(i) for i in args.fflayers])
+    new_dir_name += "_"+layerstr
 
-        nfh = logging.FileHandler(str(output_dir / 'alpaca.log'))
-        nfh.setLevel(logging.DEBUG)
-        nfh.setFormatter(ff)
-        log.addHandler(nfh)
+    output_dir = output_dir / new_dir_name
+    output_dir.mkdir(parents=True, exist_ok=True)
+    log.info('Writing to dir: %s', new_dir_name)
+
+    nfh = logging.FileHandler(str(output_dir / 'alpaca.log'))
+    nfh.setLevel(logging.DEBUG)
+    nfh.setFormatter(ff)
+    log.addHandler(nfh)
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     log.debug('Signal input: %s', args.sig)
-    bm = BatchManager(sig_path=args.sig, shuffle_jets=args.shuffle_jets, shuffle_events=args.shuffle_events)
+    njets = 7
+    bm = BatchManager(sig_path=args.sig, shuffle_jets=args.shuffle_jets, shuffle_events=args.shuffle_events, jets_per_event=njets, zero_jets=3)
 
-    nobjects = 10
-    ncombos = 30
-    njets = 10
-    ntomatch = 6
-    noutputs = njets + ntomatch
-    log.debug('CoLaLoLa: nr. jets %s - nr. combos %s', nobjects, ncombos)
-    model = CoLaLoLa(nobjects, ncombos, noutputs)
+    nobjects = njets
+    ntomatch = 5
+    noutputs = njets + ntomatch + 6 # b-jet tag
+    if args.simple_nn:
+        log.info('SimpleNN: nr. jets %s', nobjects)
+        log.info('  FeedForwardHead intermediate layers: [%s]', layerstr.replace('_',','))
+        model = SimpleNN(nobjects, noutputs, fflayers=args.fflayers)
+    else:
+        log.info('CoLaLoLa: nr. jets %s - nr. combos %s', nobjects, args.ncombos)
+        log.info('  FeedForwardHead intermediate layers: [%s]', layerstr.replace('_',','))
+        model = CoLaLoLa(nobjects, args.ncombos, noutputs, fflayers=args.fflayers)
     opt = torch.optim.Adam(model.parameters())
     losses = []
 
-    nr_train = 500
-    batch_size = 500
+    nr_train = 250
+    batch_size = 250
     # No stats right now
     if args.quick_test:
         nr_train = 100
@@ -169,31 +198,54 @@ if __name__ == '__main__':
     plt.plot(losses)
     plt.savefig(str(output_dir / 'losses.png'))
 
-    log.info('Save plot model')
-    fig = plt.figure()
-    plt.imshow(model.cola.w_combo.data.numpy())
-    plt.savefig(str(output_dir / 'w_combo.png'))
+    if not args.simple_nn:
+        log.info('Save plot model')
+        fig = plt.figure()
+        plt.imshow(model.cola.w_combo.data.numpy())
+        plt.savefig(str(output_dir / 'w_combo.png'))
 
-    log.info('Make torch batch')
-    X,Y = bm.get_torch_batch(50000, nr_train * batch_size)
+    log.info('Running on validation sample')
+    X,Y = bm.get_torch_batch(10000, nlabels=noutputs, start_index=nr_train * batch_size)
     P = model(X)
 
     _P = P.data.numpy()
     _Y = Y.data.numpy().squeeze()
 
+    log.info('Aggregating predictions for training sample')
+    X1,Y1 = bm.get_torch_batch(nr_train*batch_size, nlabels=noutputs, start_index=0)
+    P1 = model(X1)
+    _P1 = P1.data.numpy()
+    _Y1 = Y1.data.numpy().squeeze()
+
+    bm_6j = BatchManager(sig_path=args.sig, shuffle_jets=args.shuffle_jets, shuffle_events=args.shuffle_events, jets_per_event=njets, zero_jets=4)
+
     log.info('Plot Histograms and ROC curves for ISR-tagging')
     for ijet in range(njets):
         _Pjet = _P[:,ijet]
         _Yjet = _Y[:,ijet]
+        _P1jet = _P1[:,ijet]
+        _Y1jet = _Y1[:,ijet]
         fig = plt.figure()
         plt.hist(_Pjet[_Yjet==0],
                  bins = np.linspace(0, 1, 50),
-                 label='ISR jet',
+                 label='ISR jet (Test)',
                  density=True,
-                 histtype='step')
+                 histtype='step',
+                 alpha=0.5, fill=True)
         plt.hist(_Pjet[_Yjet==1],
                  bins = np.linspace(0, 1, 50),
-                 label='Top jet',
+                 label='Top jet (Test)',
+                 density=True,
+                 histtype='step',
+                 alpha=0.5, fill=True)
+        plt.hist(_P1jet[_Y1jet==0],
+                 bins = np.linspace(0, 1, 50),
+                 label='ISR jet (Train)',
+                 density=True,
+                 histtype='step')
+        plt.hist(_P1jet[_Y1jet==1],
+                 bins = np.linspace(0, 1, 50),
+                 label='Top jet (Train)',
                  density=True,
                  histtype='step')
         #plt.semilogy()
@@ -219,22 +271,36 @@ if __name__ == '__main__':
 
     log.info('Plot Histograms and ROC curves for top/tbar matching')
     for ijet in range(ntomatch):
-        _Pjet = _P[:,ijet+10]
-        _Yjet = _Y[:,ijet+10]
+        _Pjet = _P[:,ijet+njets]
+        _Yjet = _Y[:,ijet+njets]
+        _P1jet = _P1[:,ijet+njets]
+        _Y1jet = _Y1[:,ijet+njets]
         fig = plt.figure()
-        plt.hist(_Pjet[_Yjet==0],
-                 bins = np.linspace(0, 1, 50),
-                 label='Top jet',
-                 density=True,
-                 histtype='step')
         plt.hist(_Pjet[_Yjet==1],
                  bins = np.linspace(0, 1, 50),
-                 label='Antitop jet',
+                 label='Same decay as leading (Train)',
+                 density=True,
+                 histtype='step',
+                 alpha=0.5, fill=True)
+        plt.hist(_Pjet[_Yjet==0],
+                 bins = np.linspace(0, 1, 50),
+                 label='Different decay from leading (Train)',
+                 density=True,
+                 histtype='step',
+                 alpha=0.5, fill=True)
+        plt.hist(_P1jet[_Y1jet==1],
+                 bins = np.linspace(0, 1, 50),
+                 label='Same decay as leading (Test)',
+                 density=True,
+                 histtype='step')
+        plt.hist(_P1jet[_Y1jet==0],
+                 bins = np.linspace(0, 1, 50),
+                 label='Different decay from leading (Test)',
                  density=True,
                  histtype='step')
         #plt.semilogy()
         plt.legend()
-        plt.savefig(str(output_dir / 'score_ttbar_jet{}.png'.format(ijet)))
+        plt.savefig(str(output_dir / 'score_ttbar_jet{}.png'.format(ijet+1)))
         plt.close()
 
         fpr, tpr, thr = roc_curve(_Yjet, _Pjet)
@@ -250,7 +316,101 @@ if __name__ == '__main__':
         plt.ylabel('True Positive Rate')
         #plt.title('Receiver operating characteristic')
         plt.legend(loc="lower right")
-        plt.savefig(str(output_dir / 'roc_curve_ttbar_jet{}.png'.format(ijet)))
+        plt.savefig(str(output_dir / 'roc_curve_ttbar_jet{}.png'.format(ijet+1)))
+        plt.close()
+
+    log.info('Plot Histograms and ROC curves for b-jet identification')
+    for ijet in range(6):
+        _Pjet = _P[:,ijet+njets+ntomatch]
+        _Yjet = _Y[:,ijet+njets+ntomatch]
+        _P1jet = _P1[:,ijet+njets+ntomatch]
+        _Y1jet = _Y1[:,ijet+njets+ntomatch]
+        fig = plt.figure()
+        plt.hist(_Pjet[_Yjet==1],
+                 bins = np.linspace(0, 1, 50),
+                 label='B-jet (Train)',
+                 density=True,
+                 histtype='step',
+                 alpha=0.5, fill=True)
+        plt.hist(_Pjet[_Yjet==0],
+                 bins = np.linspace(0, 1, 50),
+                 label='W decay jet (Train)',
+                 density=True,
+                 histtype='step',
+                 alpha=0.5, fill=True)
+        plt.hist(_P1jet[_Y1jet==1],
+                 bins = np.linspace(0, 1, 50),
+                 label='B-jet (Test)',
+                 density=True,
+                 histtype='step')
+        plt.hist(_P1jet[_Y1jet==0],
+                 bins = np.linspace(0, 1, 50),
+                 label='W decay jet (Test)',
+                 density=True,
+                 histtype='step')
+        #plt.semilogy()
+        plt.legend()
+        plt.savefig(str(output_dir / 'score_bjet_jet{}.png'.format(ijet+1)))
+        plt.close()
+
+        fpr, tpr, thr = roc_curve(_Yjet, _Pjet)
+        roc_auc = auc(fpr, tpr)
+
+        fig = plt.figure()
+        plt.plot(fpr, tpr, color='darkorange',
+                 label='ROC curve (area = {:.2f})'.format(roc_auc))
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        #plt.title('Receiver operating characteristic')
+        plt.legend(loc="lower right")
+        plt.savefig(str(output_dir / 'roc_curve_bjet_jet{}.png'.format(ijet+1)))
+        plt.close()
+
+    log.info('Test on events with exactly 6 jets')
+    # Takes roughly the last 10k events of the 70k 6-jet events
+    X2,Y2 = bm.get_torch_batch(10000, nlabels=noutputs, start_index=60000)
+    P2 = model(X2)
+    _P2 = P2.data.numpy()
+    _Y2 = Y2.data.numpy().squeeze()
+    log.info('Plot Histograms and ROC curves for top/tbar matching on 6-jet events')
+    for ijet in range(ntomatch):
+        _P2jet = _P2[:,ijet+njets]
+        _Y2jet = _Y2[:,ijet+njets]
+        fig = plt.figure()
+        plt.hist(_P2jet[_Y2jet==1],
+                 bins = np.linspace(0, 1, 50),
+                 label='Same decay as leading (6 jets)',
+                 density=True,
+                 histtype='step',
+                 alpha=0.5, fill=True)
+        plt.hist(_P2jet[_Y2jet==0],
+                 bins = np.linspace(0, 1, 50),
+                 label='Different decay from leading (6 jets)',
+                 density=True,
+                 histtype='step',
+                 alpha=0.5, fill=True)
+        #plt.semilogy()
+        plt.legend()
+        plt.savefig(str(output_dir / 'score_ttbar6j_jet{}.png'.format(ijet+1)))
+        plt.close()
+
+        fpr, tpr, thr = roc_curve(_Y2jet, _P2jet)
+        roc_auc = auc(fpr, tpr)
+
+        fig = plt.figure()
+        plt.plot(fpr, tpr, color='darkorange',
+                 label='ROC curve (area = {:.2f})'.format(roc_auc))
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        #plt.title('Receiver operating characteristic')
+        plt.legend(loc="lower right")
+        plt.savefig(str(output_dir / 'roc_curve_ttbar6j_jet{}.png'.format(ijet+1)))
         plt.close()
 
     # w = model.cola.w_combo.data.numpy()
