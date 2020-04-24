@@ -1,4 +1,5 @@
 import torch
+from .feedforward import FeedForwardHead
 
 
 class CoLa(torch.nn.Module):
@@ -8,8 +9,11 @@ class CoLa(torch.nn.Module):
         self.ncombos = ncombos
         self.outputobj = ncombos + nobjects
         self.identity = torch.eye(self.nobjects)
+        # Trainable weights for linear combinations
         self.w_combo = torch.nn.Parameter(torch.randn(self.ncombos, self.nobjects))
 
+    # Generate linear combinations of four-vectors
+    # Passes on the original four-vectors followed by the combinations
     def forward(self,vectors):
         combo = torch.cat([self.identity, self.w_combo], dim=0)
         combvec = torch.einsum('ij,bjk->bik', combo, vectors)
@@ -25,6 +29,9 @@ class LoLa(torch.nn.Module):
         self.w_pid = torch.nn.Parameter(torch.randn(self.outputobj, self.outputobj))
         self.metric = torch.diag(torch.tensor([1., -1., -1., -1.]))
 
+    # Calculate Lorentz invariants from the input four-vectors
+    # These four-vectors are either the original jets, or the
+    # corresponding combinations
     def forward(self, combvec):
         weighted_e = torch.einsum('ij,bj->bi', self.w_ener,combvec[:, :, 0])
         weighted_p = torch.einsum('ij,bj->bi', self.w_pid,combvec[:, :, -1])
