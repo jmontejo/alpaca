@@ -93,6 +93,8 @@ class BatchManager:
         isbjet = np.array( [ np.equal(r,1) | np.equal(r,4) for r in nonisrlabels] )
         jetlabels = np.concatenate([jetfromttbar.squeeze(),topmatch[:,1:],isbjet],1)
         # Substitute this line for the preceding if only doing the 6 top jets
+        # Not currently configurable by command line because it's a bit more
+        # complicated overall + less often changed
         # topmatch = np.array( [ r>3 if r[0]>3 else r<3 for r in labels] )
         # isbjet = np.array( [ np.equal(r,1) | np.equal(r,4) for r in labels] )
         # jetlabels = np.concatenate([jetfromttbar.squeeze(),topmatch[:,1:],isbjet],1)
@@ -157,7 +159,8 @@ if __name__ == '__main__':
 
     nobjects = njets
     ntomatch = 5
-    noutputs = njets + ntomatch + 6 # b-jet tag
+    ntobtag = 6
+    noutputs = njets + ntomatch + ntobtag
     if args.simple_nn:
         log.info('SimpleNN: nr. jets %s', nobjects)
         log.info('  FeedForwardHead intermediate layers: [%s]', layerstr.replace('_',','))
