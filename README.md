@@ -81,7 +81,7 @@ A concrete example is as follows:
 Parton labels:    [ 0, 3, 4, 1, 5, 0, 2, 6, 0, 0 ]
 Top jet labels:   [ 0, 1, 1, 1, 1, 0, 1, 1, 0, 0 ]
 Top decay labels: [       0, 1, 0,    1, 0       ]
-B-jet labels:     [    0, 0, 1, 0, 0, 1, 0       ]
+B-jet labels:     [    0, 1, 1, 0, 0, 0, 0       ]
 ```
 
 After running the model on an event, one can therefore attempt to reconstruct the top system according to the following steps:
