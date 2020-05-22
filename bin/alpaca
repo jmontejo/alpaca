@@ -26,6 +26,8 @@ import torch
 from sklearn.metrics import roc_curve, auc
 from progressbar import progressbar
 
+from collections import defaultdict
+
 from alpaca.colalola import CoLaLoLa
 
 
@@ -65,11 +67,52 @@ class BatchManager:
             namedecode='ascii'
         )
 
+        N_jets = 10
+
+        for i in range(len(arrays['jet_pt'])):
+            for a,b in zip(arrays['jet_pt'][i][:-1], arrays['jet_pt'][i][1:]):
+                if a < b:
+                    print('Bau: {} < {}'.format(a, b))
+            for lbl in ['jet_pt', 'jet_eta', 'jet_phi', 'jet_e']:
+                for _ in range(N_jets - len(new_arrays[lbl][-1])):
+                    new_arrays[lbl][-1].append(0)
+
+        new_arrays = defaultdict(list)
+        for i in range(len(arrays['jet_pt'])):
+           index_w1ja = arrays['reco_index_w1ja'][i]
+           index_w2ja = arrays['reco_index_w2ja'][i]
+           index_w1jb = arrays['reco_index_w1jb'][i]
+           index_w2jb = arrays['reco_index_w2jb'][i]
+           index_b1 = arrays['reco_index_b1'][i]
+           index_b2 = arrays['reco_index_b2'][i]
+
+           extras = list(range(len(arrays['jet_pt'][i])))
+           extras.remove(index_w1ja)
+           extras.remove(index_w1jb)
+           extras.remove(index_w2ja)
+           extras.remove(index_w2jb)
+           extras.remove(index_b1)
+           extras.remove(index_b2)
+           for lbl in ['jet_pt', 'jet_eta', 'jet_phi', 'jet_e']:
+               new_arrays[lbl].append([
+                   arrays[lbl][i][index_w1ja],
+                   arrays[lbl][i][index_w1jb],
+                   arrays[lbl][i][index_b1],
+                   arrays[lbl][i][index_w2ja],
+                   arrays[lbl][i][index_w2jb],
+                   arrays[lbl][i][index_b2],
+               ])
+               # TODO: add the leading extra jets
+               for index_extra in extras[:N_jets - 6]:
+                   new_arrays[lbl][-1].append(arrays[lbl][i][index_extra])
+               for _ in range(N_jets - len(new_arrays[lbl][-1])):
+                   new_arrays[lbl][-1].append(0)
+
         table = awkward.Table(
-            pt=awkward.fromiter(arrays['jet_pt']),
-            eta=awkward.fromiter(arrays['jet_eta']),
-            phi=awkward.fromiter(arrays['jet_phi']),
-            e=awkward.fromiter(arrays['jet_e'])
+            pt=awkward.fromiter(new_arrays['jet_pt']),
+            eta=awkward.fromiter(new_arrays['jet_eta']),
+            phi=awkward.fromiter(new_arrays['jet_phi']),
+            e=awkward.fromiter(new_arrays['jet_e'])
         )
 
         lor_vec = uproot_methods.TLorentzVectorArray.from_ptetaphi(
@@ -141,7 +184,7 @@ if __name__ == '__main__':
     log.debug('Background input: %s', args.bkg)
     bm = BatchManager(sig_path=args.sig, bkg_path=args.bkg)
 
-    nobjects = 6
+    nobjects = 10#6
     ncombos = 30
     log.debug('CoLaLoLa: nr. jets %s - nr. combos %s', nobjects, ncombos)
     model = CoLaLoLa(nobjects, ncombos)
