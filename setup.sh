@@ -3,8 +3,12 @@
 function setup_conda () {
 
   echo "[INFO] Activating conda..."
-  . "${HOME}/.miniconda3/etc/profile.d/conda.sh"
 
+  if [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+      . "$HOME/anaconda3/etc/profile.d/conda.sh"
+  else
+    . "$HOME/miniconda3/etc/profile.d/conda.sh"
+  fi
   conda activate alpaca
 
   echo "[INFO] Setting env variables..."
@@ -29,45 +33,5 @@ function setup_conda () {
   echo "[INFO] Finished env setup"
 }
 
-
-function setup_root () {
-
-  echo "[INFO] Setup ATLAS software... (will take a while)"
-  export ATLAS_LOCAL_ROOT_BASE=/cvmfs/atlas.cern.ch/repo/ATLASLocalRootBase
-  source /cvmfs/atlas.cern.ch/repo/ATLASLocalRootBase/user/atlasLocalSetup.sh > /dev/null
-
-
-  LCG="LCG_96"
-  ARCH="x86_64-centos7-gcc8-opt"
-
-  echo "[INFO] Setup root 6.18.00-${ARCH}..."
-  lsetup "root 6.18.00-${ARCH}" > /dev/null
-
-  echo "[INFO] Setup python..."
-  lsetup python > /dev/null
-  echo "[INFO] Setup python module pathlib2..."
-  lsetup "lcgenv -p ${LCG} ${ARCH} pathlib2" > /dev/null
-
-  echo "[INFO] Finished root setup"
-}
-
-
-case "$1" in
-   "") 
-      echo "Usage : $0 [conda|root]"
-      ;;
-   conda)
-      setup_conda
-      ;;
-   root)
-      setup_root
-      ;;
-esac
-
-#if [[ $1 == root ]]; then
-#    setup_root
-#else
-#    setup_env
-#fi
-
+setup_conda
 echo "[INFO] Finished"

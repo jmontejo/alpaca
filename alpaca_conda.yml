@@ -1,0 +1,14 @@
+name: alpaca
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - pytables
+  - matplotlib
+  - progressbar2
+  - pandas
+  - pytorch
+  - awkward
+  - uproot-methods
+  - uproot
+  - scikit-learn

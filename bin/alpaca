@@ -1,186 +1,75 @@
 #!/usr/bin/env python
 
-import logging
-log = logging.getLogger('alpaca')
-log.setLevel(logging.DEBUG)
-fh = logging.FileHandler('alpaca.log')
-fh.setLevel(logging.DEBUG)
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-ff = logging.Formatter('[%(asctime)s] %(levelname)s :: %(message)s')
-cf = logging.Formatter('[%(levelname)s] %(message)s')
-fh.setFormatter(ff)
-ch.setFormatter(cf)
-log.addHandler(fh)
-log.addHandler(ch)
-
 from pathlib import Path
 import datetime
 
-import uproot
-import uproot_methods
-import awkward
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
-from sklearn.metrics import roc_curve, auc
 from progressbar import progressbar
+import matplotlib.pyplot as plt
 
-from collections import defaultdict
-
-from alpaca.colalola import CoLaLoLa
-
-
-class BatchManager:
-
-    def __init__(self, sig_path, bkg_path):
-        self._sig_lv = self.get_lorentz_vectors(sig_path)
-        self._bkg_lv = self.get_lorentz_vectors(bkg_path)
-        log.info('Nr. of signal events: %s', len(self._sig_lv))
-        log.info('Nr. of background events: %s', len(self._bkg_lv))
- 
-    @staticmethod
-    def get_lorentz_vectors(file_path):
-        """
-        The returned object looks like this:
-        
-        [[[event 1 jet 1 t, event 1 jet 1 x, event 1 jet 1 y, event 1 jet 1 z]
-          [event 1 jet 2 t, event 1 jet 2 x, event 1 jet 2 y, event 1 jet 2 z]
-          [event 1 jet 3 t, event 1 jet 3 x, event 1 jet 3 y, event 1 jet 3 z]
-          [event 1 jet 4 t, event 1 jet 4 x, event 1 jet 4 y, event 1 jet 4 z]
-          [event 1 jet 5 t, event 1 jet 5 x, event 1 jet 5 y, event 1 jet 5 z]
-          [event 1 jet 6 t, event 1 jet 6 x, event 1 jet 6 y, event 1 jet 6 z]]
-          [[event 2 jet 1 t, event 2 jet 1 x, event 2 jet 1 y, event 1 jet 1 z]
-          [event 2 jet 2 t, event 2 jet 2 x, event 2 jet 2 y, event 1 jet 2 z]
-           ...
-
-        basically they are separated by events. For each event they are
-        separated by jet: jet 1, jet 2, etc. And for each jet the four elements
-        are the four coordinates of the TLorentz vector: t, x, y, z.
-        """
-        nominal = uproot.open(str(file_path))['nominal']
-        arrays = nominal.arrays(
-            ['reco_bjets', 'jet_pt', 'jet_eta', 'jet_phi', 'jet_e', 'jet_n',
-             'reco_index_w[12]j[ab]', 'reco_index_b[12]',
-             'reco_Chi2Fitted', 'reco_DRbWMax', 'reco_DRbb',
-             'reco_t[12]_m'],
-            namedecode='ascii'
-        )
-
-        N_jets = 10
-
-        for i in range(len(arrays['jet_pt'])):
-            for a,b in zip(arrays['jet_pt'][i][:-1], arrays['jet_pt'][i][1:]):
-                if a < b:
-                    print('Bau: {} < {}'.format(a, b))
-            for lbl in ['jet_pt', 'jet_eta', 'jet_phi', 'jet_e']:
-                for _ in range(N_jets - len(new_arrays[lbl][-1])):
-                    new_arrays[lbl][-1].append(0)
-
-        new_arrays = defaultdict(list)
-        for i in range(len(arrays['jet_pt'])):
-           index_w1ja = arrays['reco_index_w1ja'][i]
-           index_w2ja = arrays['reco_index_w2ja'][i]
-           index_w1jb = arrays['reco_index_w1jb'][i]
-           index_w2jb = arrays['reco_index_w2jb'][i]
-           index_b1 = arrays['reco_index_b1'][i]
-           index_b2 = arrays['reco_index_b2'][i]
-
-           extras = list(range(len(arrays['jet_pt'][i])))
-           extras.remove(index_w1ja)
-           extras.remove(index_w1jb)
-           extras.remove(index_w2ja)
-           extras.remove(index_w2jb)
-           extras.remove(index_b1)
-           extras.remove(index_b2)
-           for lbl in ['jet_pt', 'jet_eta', 'jet_phi', 'jet_e']:
-               new_arrays[lbl].append([
-                   arrays[lbl][i][index_w1ja],
-                   arrays[lbl][i][index_w1jb],
-                   arrays[lbl][i][index_b1],
-                   arrays[lbl][i][index_w2ja],
-                   arrays[lbl][i][index_w2jb],
-                   arrays[lbl][i][index_b2],
-               ])
-               # TODO: add the leading extra jets
-               for index_extra in extras[:N_jets - 6]:
-                   new_arrays[lbl][-1].append(arrays[lbl][i][index_extra])
-               for _ in range(N_jets - len(new_arrays[lbl][-1])):
-                   new_arrays[lbl][-1].append(0)
-
-        table = awkward.Table(
-            pt=awkward.fromiter(new_arrays['jet_pt']),
-            eta=awkward.fromiter(new_arrays['jet_eta']),
-            phi=awkward.fromiter(new_arrays['jet_phi']),
-            e=awkward.fromiter(new_arrays['jet_e'])
-        )
-
-        lor_vec = uproot_methods.TLorentzVectorArray.from_ptetaphi(
-            table.pt,
-            table.eta,
-            table.phi,
-            table.e
-        )
-
-        lor_vec_stack = np.stack(
-            [lor_vec.t.regular(),
-             lor_vec.x.regular(),
-             lor_vec.y.regular(),
-             lor_vec.z.regular()],
-            axis=-1
-        )
-
-        return lor_vec_stack
-
-    def get_torch_batch(self, N, start_index=0):
-        stop_index = start_index + N
-        if stop_index > min(len(self._sig_lv), len(self._bkg_lv)):
-            log.warning('The stop index is grater than the size of the array')
-        lv = np.concatenate([self._sig_lv[start_index:stop_index],
-                             self._bkg_lv[start_index:stop_index]])
-        scores = np.concatenate([np.ones(N), np.zeros(N)])
-
-        X = torch.as_tensor(lv, dtype=torch.float)
-        Y = torch.as_tensor(scores, dtype=torch.float)
-        return X, Y
+from alpaca.logging import log, logging, ff
+from alpaca.batch import BatchManager
 
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='ML top-like tagger.')
-    parser.add_argument('--bkg', required=True, type=Path,
-                        help='path to the file with bkg events')
     parser.add_argument('--sig', required=True, type=Path,
                         help='path to the file with sig events')
     parser.add_argument('--quick-test', action='store_true',
                         help='set params for a quick test')
     parser.add_argument('--output-dir', type=Path, default=Path('data'),
                         help='path to the output directory')
-    parser.add_argument('--tag', nargs='?', const='',
+    parser.add_argument('--tag', default='alpaca',
                         help='tag the output')
+    parser.add_argument('--shuffle-jets', action='store_true',
+                        help='reorder jets in each event')
+    parser.add_argument('--shuffle-events', action='store_true',
+                        help='reorder events in the dataset')
+    parser.add_argument('--simple-nn', action='store_true',
+                        help='substitute a simple feed-forward NN for colalola')
+    parser.add_argument('--hydra', action='store_true',
+                        help='a colalola network with multiple output heads')
+    parser.add_argument('--alt-loss', action='store_true',
+                        help='try a different loss function')
+    parser.add_argument("--fflayers", nargs="+", type=int, default=[200])
+    parser.add_argument("--ncombos", type=int, default=30)
     args = parser.parse_args()
 
     if args.quick_test:
         args.tag = 'test'
 
+    # Autogenerate meaningful names for output dir
     output_dir = args.output_dir
-    if args.tag is not None:
-        now = datetime.datetime.now()
-        if args.tag:
-            new_dir_name = '{:%Y%m%d_%H%M%S}_{}'.format(now, args.tag)
-        else:
-            new_dir_name = '{:%Y%m%d_%H%M%S}'.format(now)
-        output_dir = output_dir / new_dir_name
-        output_dir.mkdir(parents=True, exist_ok=True)
+    new_dir_name = args.tag
+    if args.shuffle_jets:
+        new_dir_name += "_shuffled"
+    else:
+        new_dir_name += "_ptordered"
+    if args.simple_nn:
+        new_dir_name += "_simplenn"
+    elif args.hydra:
+        new_dir_name += "_hydra"
+    if args.alt_loss:
+        new_dir_name += "_altloss"
+    new_dir_name += "_{}combos".format(args.ncombos)
+    layerstr = '_'.join([str(i) for i in args.fflayers])
+    new_dir_name += "_"+layerstr
 
-        nfh = logging.FileHandler(str(output_dir / 'alpaca.log'))
-        nfh.setLevel(logging.DEBUG)
-        nfh.setFormatter(ff)
-        log.addHandler(nfh)
+    output_dir = output_dir / new_dir_name
+    output_dir.mkdir(parents=True, exist_ok=True)
+    log.info('Writing to dir: %s', new_dir_name)
+
+    nfh = logging.FileHandler(str(output_dir / 'alpaca.log'))
+    nfh.setLevel(logging.DEBUG)
+    nfh.setFormatter(ff)
+    log.addHandler(nfh)
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     log.debug('Signal input: %s', args.sig)
+<<<<<<< HEAD
     log.debug('Background input: %s', args.bkg)
     bm = BatchManager(sig_path=args.sig, bkg_path=args.bkg)
 
@@ -188,19 +77,46 @@ if __name__ == '__main__':
     ncombos = 30
     log.debug('CoLaLoLa: nr. jets %s - nr. combos %s', nobjects, ncombos)
     model = CoLaLoLa(nobjects, ncombos)
-    opt = torch.optim.Adam(model.parameters())
-    losses = []
+=======
+    njets = 7
+    bm = BatchManager(sig_path=args.sig, shuffle_jets=args.shuffle_jets, shuffle_events=args.shuffle_events, jets_per_event=njets, zero_jets=10-njets)
 
-    nr_train = 190
-    batch_size = 350
+    nobjects = njets
+    ntomatch = 5
+    ntobtag = 6
+    noutputs = njets + ntomatch + ntobtag
+    if args.simple_nn:
+        from alpaca.simple import SimpleNN
+        log.info('SimpleNN: nr. jets %s', nobjects)
+        log.info('  FeedForwardHead intermediate layers: [%s]', layerstr.replace('_',','))
+        model = SimpleNN(nobjects, noutputs, fflayers=args.fflayers)
+    elif args.hydra:
+        from alpaca.hydra import Hydra
+        log.info('CoLaLoLa with multiple heads: nr. jets %s - nr. combos %s', nobjects, args.ncombos)
+        log.info('  FeedForwardHead intermediate layers: [%s]', layerstr.replace('_',','))
+        model = Hydra(nobjects, args.ncombos, fflayers=args.fflayers)
+    else: # Plain CoLaLoLa as default
+        from alpaca.colalola import CoLaLoLa
+        log.info('CoLaLoLa: nr. jets %s - nr. combos %s', nobjects, args.ncombos)
+        log.info('  FeedForwardHead intermediate layers: [%s]', layerstr.replace('_',','))
+        model = CoLaLoLa(nobjects, args.ncombos, noutputs, fflayers=args.fflayers)
+>>>>>>> khoo/alpaca-master
+    opt = torch.optim.Adam(model.parameters())
+    losses = {"total":[], "ISR":[], "decay":[], "bjet":[]}
+    if args.alt_loss: losses.update({"penalty_ISR":[], "penalty_decay":[]})
+
+    nr_train = 250
+    batch_size = 250
+    # No stats right now
     if args.quick_test:
-        nr_train = 5
-        batch_size = 500
+        nr_train = 100
+        batch_size = 100
     log.debug('Training: %s iterations - batch size %s', nr_train, batch_size)
     for i in progressbar(range(nr_train)):
         model.train()
         opt.zero_grad()
 
+<<<<<<< HEAD
         X, Y = bm.get_torch_batch(batch_size, start_index=i * batch_size)
         P, masses = model(X)
         P, Y = P, Y.reshape(-1, 1)
@@ -212,10 +128,34 @@ if __name__ == '__main__':
         #    #plt.plot(losses)
         #    #plt.show()
         loss.backward()
+=======
+        X, Y = bm.get_torch_batch(batch_size, nlabels=njets, start_index=i * batch_size+5000)
+        P = model(X)
+        Y = Y.reshape(-1, noutputs)
+        P_ISR,   Y_ISR = P[:,:njets], Y[:,:njets]
+        P_decay, Y_decay = P[:,njets:njets+5], Y[:,njets:njets+5]
+        P_bjet,  Y_bjet = P[:,njets+5:], Y[:,njets+5:]
+
+        loss = {
+            "ISR":   torch.nn.functional.binary_cross_entropy(P_ISR,   Y_ISR),
+            "decay": torch.nn.functional.binary_cross_entropy(P_decay, Y_decay),
+            "bjet":  torch.nn.functional.binary_cross_entropy(P_bjet,  Y_bjet),
+        }
+        loss["total"] = loss["ISR"] + loss["decay"] + loss["bjet"]
+        if args.alt_loss:
+            loss["penalty_ISR"] = P_ISR[Y_ISR==0].mean() + (1 - P_ISR[Y_ISR==1]).mean()
+            loss["penalty_decay"] = P_decay[Y_decay==0].mean() + (1 - P_decay[Y_decay==1]).mean()
+            loss["total"] += loss["penalty_ISR"] + loss["penalty_decay"]
+
+        for key, val in loss.items():
+            losses[key].append(float(val))
+        loss["total"].backward()
+>>>>>>> khoo/alpaca-master
         opt.step()
 
     log.debug('Finished training')
     fig = plt.figure()
+<<<<<<< HEAD
     plt.plot(losses)
     plt.savefig(str(output_dir / 'losses.png'))
 
@@ -315,11 +255,84 @@ if __name__ == '__main__':
     plt.savefig(str(output_dir / 'ravel.png'))
 
     X.data.numpy()[Y==0, :, 1]
+=======
+    for losstype, lossvals in losses.items():
+        plt.plot(lossvals,label=losstype)
+    plt.legend()
+    plt.savefig(str(output_dir / 'losses.png'))
+>>>>>>> khoo/alpaca-master
 
-    #log.info('Make torch batch')
-    #X, Y = bm.get_torch_batch(500, nr_train * batch_size)
-    #np.unique(X[Y==1].data.numpy()[:, :, 0].ravel()).shape
-    #fig = plt.figure()
-    #_,b,_ = plt.hist(X[Y==1].data.numpy()[:, :, 0].ravel(),bins=100);
-    #plt.hist(X[Y==0].data.numpy()[:, :, 0].ravel(),bins=b);
-    #plt.savefig('data/ravel_2.png')
+    pred = {"ISR":{}, "ttbar":{}, "bjet":{}}
+    truth = {"ISR":{}, "ttbar":{}, "bjet":{}}
+    jets = {}
+    def fill_arrays(batch, label, model, filter_6j=False):
+        X, Y = batch
+        if filter_6j:
+            mask = (X[:,:,3]>0).sum(1)==6
+            nsel = np.count_nonzero(mask)
+            X = X[mask].reshape(nsel,X.shape[1],X.shape[2])
+            Y = Y[mask].reshape(nsel,Y.shape[1])
+
+        x = X.data.numpy()
+        jets[label] = x
+        #
+        y = Y.data.numpy()
+        p = model(X).data.numpy()
+        # Alternatively, can split up the model output
+        pred["ISR"][label]   = p[:,:njets]
+        pred["ttbar"][label] = p[:,njets:njets+5]
+        pred["bjet"][label]  = p[:,njets+5:]
+        #
+        truth["ISR"][label]   = y[:,:njets]
+        truth["ttbar"][label] = y[:,njets:njets+5]
+        truth["bjet"][label]  = y[:,njets+5:]
+
+    log.info('Extracting test sample')
+    fill_arrays(bm.get_torch_batch(5000, nlabels=njets, start_index=(nr_train*batch_size)+5000), "Test", model)
+    log.info(len(jets["Test"]))
+    log.info('Sampling predictions for training sample')
+    fill_arrays(bm.get_torch_batch(5000, nlabels=njets, start_index=5000), "Train", model)
+    log.info(len(jets["Train"]))
+
+    bm_6j = BatchManager(sig_path=args.sig, shuffle_jets=args.shuffle_jets, shuffle_events=args.shuffle_events, jets_per_event=njets, zero_jets=4)
+    log.info('Extracting sample of events with exactly 6 jets')
+    # sample from the last events of the 39k 6-jet events
+    fill_arrays(bm_6j.get_torch_batch(1500, nlabels=njets, start_index=0), "6-jet", model)
+    log.info(len(jets["6-jet"]))
+
+    # Flatten & save numpy arrays
+    flatdict = {}
+    for sample in ["Test","Train","6-jet"]:
+        flatdict["jets_{}".format(sample)] = jets[sample]
+        for discr in ["ISR","ttbar","bjet"]:
+            flatdict["pred_{}_{}".format(discr,sample)] = pred[discr][sample]
+            flatdict["truth_{}_{}".format(discr,sample)] = truth[discr][sample]
+    np.savez(str(output_dir / "data.npz"), **flatdict)
+
+    from alpaca.plot import *
+    log.info('Plot combination weights')
+    if args.simple_nn:
+        # No cola plots
+        pass
+    elif args.hydra:
+        plot_hydra_weights(model, output_dir)
+    else:
+        plot_cola_weights(model, output_dir)
+
+    log.info('Plot scores and ROC curves for top/tbar matching')
+    plot_score_roc(pred, truth, "ttbar", output_dir, plotlabels = ("Same decay as leading", "Different decay from leading"), irange = range(5))
+
+    log.info('Plot scores and ROC curves for b-jet identification')
+    plot_score_roc(pred, truth, "bjet", output_dir, plotlabels = ("b-jet", "W decay jet"), irange = range(6))
+
+    log.info('Plot scores for jets from tops 1 and 2')
+    plot_topmatch(pred, truth, output_dir)
+    if njets>6:
+        log.info('Plot scores and ROC curves for ISR-tagging')
+        plot_score_roc(pred, truth, "ISR", output_dir, plotlabels = ("Top jet", "ISR jet"), irange = range(njets))
+
+        log.info('Plot score for true ISR jet')
+        plot_true_ISR(pred, truth, output_dir)
+
+        log.info('Plot index of ISR jet')
+        plot_index_ISR(pred, truth, output_dir)
