@@ -10,7 +10,7 @@ class SimpleNN(torch.nn.Module):
         self.head = FeedForwardHead([self.ntotal * 4] + fflayers + [noutputs])
 
     # Jets go in, labels come out
-    def forward(self,vectors):
+    def forward(self, vectors):
         output = vectors.reshape(vectors.shape[0], -1)
         output = self.norm(output)
         output = self.head(output)

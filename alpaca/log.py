@@ -1,9 +1,10 @@
 import logging
 
+__all__ = ['setup_logger']
+
 
 def setup_logger(file_path=None):
     root_logger = logging.getLogger()
-
 
     # stream handler
     ch = logging.StreamHandler()
@@ -19,6 +20,5 @@ def setup_logger(file_path=None):
         ff = logging.Formatter('[%(asctime)s] %(levelname)s :: %(message)s')
         fh.setFormatter(ff)
         root_logger.addHandler(fh)
-
 
     root_logger.setLevel(logging.DEBUG)

@@ -9,12 +9,16 @@ log = logging.getLogger(__name__)
 
 class BatchManager:
 
-    def __init__(self, sig_path, shuffle_jets=False, shuffle_events=False, zero_jets=0, jets_per_event=10):
-        self._labeledjets = self.get_jets(sig_path, shuffle_jets, shuffle_events, zero_jets, jets_per_event)
+    def __init__(self, sig_path, shuffle_jets=False, shuffle_events=False,
+                 zero_jets=0, jets_per_event=10):
+        self._labeledjets = self.get_jets(sig_path, shuffle_jets,
+                                          shuffle_events, zero_jets,
+                                          jets_per_event)
         log.info('Nr. of signal events: %s', len(self._labeledjets))
 
     @staticmethod
-    def get_jets(file_path,shuffle_jets=False,shuffle_events=False, zero_jets=0, jets_per_event=10):
+    def get_jets(file_path, shuffle_jets=False, shuffle_events=False,
+                 zero_jets=0, jets_per_event=10):
         """
         The returned object looks like this:
 
@@ -34,11 +38,11 @@ class BatchManager:
         The jets are zero-padded up to the 10th and pT-ordered.
         """
 
-        df = pd.read_hdf(file_path,"df")
+        df = pd.read_hdf(file_path, "df")
         # These next lines can be used to filter out some events, e.g. to
         # limit the training & evaluation to N>6 leading jets
-        leadingNcontaintop = df[[("partonindex",i) for i in range(10-zero_jets,10)]].sum(axis=1)<1
-        leadingNarenonzero = df[[("jet_e",i) for i in range(10-zero_jets,10)]].sum(axis=1)<1
+        leadingNcontaintop = df[[("partonindex", i) for i in range(10 - zero_jets, 10)]].sum(axis=1) < 1
+        leadingNarenonzero = df[[("jet_e", i) for i in range(10 - zero_jets, 10)]].sum(axis=1) < 1
         df = df[leadingNcontaintop & leadingNarenonzero]
         #
         if shuffle_events:
@@ -46,8 +50,8 @@ class BatchManager:
         nevents = len(df)
         # The input rows have all jet px, all jet py, ... all jet partonindex
         # So segment and swap axes to group by jet
-        jet_stack = np.swapaxes(df.values.reshape(nevents,5,10),1,2)
-        jet_stack = jet_stack[:,:jets_per_event,:]
+        jet_stack = np.swapaxes(df.values.reshape(nevents, 5, 10), 1, 2)
+        jet_stack = jet_stack[:, :jets_per_event, :]
         if shuffle_jets:
             # shuffle only does the outermost level
             # iterate through rows to shuffle each event individually
@@ -59,8 +63,8 @@ class BatchManager:
         stop_index = start_index + N
         if stop_index > len(self._labeledjets):
             log.warning('The stop index is greater than the size of the array')
-        jets = self._labeledjets[start_index:stop_index,:,:4]
-        labels = np.array(self._labeledjets[start_index:stop_index,:nlabels,-1:].squeeze(),dtype=int)
+        jets = self._labeledjets[start_index:stop_index, :, :4]
+        labels = np.array(self._labeledjets[start_index:stop_index, :nlabels, -1:].squeeze(), dtype=int)
 
         # Convert the parton labels to bools that the network can make sense of
         # is the jet from the ttbar system?
@@ -69,11 +73,11 @@ class BatchManager:
         # Disregard the jets that are from ISR
         # Account for charge ambiguity by identifying whether the
         # jets match the leading jet or not
-        maskedlabels = np.ma.masked_where(jetfromttbar==False,labels)
+        maskedlabels = np.ma.masked_where(jetfromttbar == False, labels)
         nonisrlabels = np.array([r.compressed() for r in maskedlabels])
-        topmatch = np.array( [ r>3 if r[0]>3 else r<=3 for r in nonisrlabels] )
-        isbjet = np.array( [ np.equal(r,1) | np.equal(r,4) for r in nonisrlabels] )
-        jetlabels = np.concatenate([jetfromttbar,topmatch[:,1:],isbjet],1)
+        topmatch = np.array([r > 3 if r[0] > 3 else r <= 3 for r in nonisrlabels])
+        isbjet = np.array([np.equal(r, 1) | np.equal(r, 4) for r in nonisrlabels])
+        jetlabels = np.concatenate([jetfromttbar, topmatch[:, 1:], isbjet], 1)
         # Substitute this line for the preceding if only doing the 6 top jets
         # Not currently configurable by command line because it's a bit more
         # complicated overall + less often changed
@@ -83,8 +87,11 @@ class BatchManager:
 
         # Check that the encoded events have the expected number of positive labels
         def good_labels(r):
-            return (r[:nlabels].sum()==6) and (r[nlabels:nlabels+5].sum()==2) and (r[nlabels+5:].sum()==2)
-        jets_clean = np.array([r for r,t in zip(jets,jetlabels) if good_labels(t)])
+            return (r[:nlabels].sum() == 6) and \
+                   (r[nlabels:nlabels+5].sum() == 2) and \
+                   (r[nlabels+5:].sum() == 2)
+        jets_clean = np.array([r for r, t in zip(jets, jetlabels)
+                               if good_labels(t)])
         jetlabels_clean = np.array([r for r in jetlabels if good_labels(r)])
 
         X = torch.as_tensor(jets_clean, dtype=torch.float)
