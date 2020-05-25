@@ -24,8 +24,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ML top-like tagger.')
     parser.add_argument('--sig', required=True, type=Path,
                         help='path to the file with sig events')
-    parser.add_argument('--quick-test', action='store_true',
-                        help='set params for a quick test')
     parser.add_argument('--output-dir', type=Path, default=Path('data'),
                         help='path to the output directory')
     parser.add_argument('--tag', default='alpaca',
@@ -44,9 +42,6 @@ if __name__ == '__main__':
     parser.add_argument("--fflayers", nargs="+", type=int, default=[200])
     parser.add_argument("--ncombos", type=int, default=30)
     args = parser.parse_args()
-
-    if args.quick_test:
-        args.tag = 'test'
 
     # Autogenerate meaningful names for output dir
     output_dir = args.output_dir
@@ -117,11 +112,8 @@ if __name__ == '__main__':
 
     nr_train = 250
     batch_size = 250
-    # No stats right now
-    if args.quick_test:
-        nr_train = 100
-        batch_size = 100
     log.debug('Training: %s iterations - batch size %s', nr_train, batch_size)
+
     for i in progressbar(range(nr_train)):
         model.train()
         opt.zero_grad()
