@@ -8,7 +8,9 @@ import datetime
 import numpy as np
 import torch
 from progressbar import progressbar
+
 import matplotlib.pyplot as plt
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
 import alpaca.log
 
@@ -66,7 +68,7 @@ if __name__ == '__main__':
     output_dir.mkdir(parents=True, exist_ok=True)
 
     alpaca.log.setup_logger(file_path=output_dir / 'alpaca.log')
-    # from this point onwards you can log :)
+    log.debug('Alpaca has been started and can finally log')
 
     log.info('Writing to dir: %s', new_dir_name)
 
