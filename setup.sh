@@ -4,21 +4,22 @@ function setup_conda () {
 
   echo "[INFO] Activating conda..."
 
-  if [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
-      . "$HOME/anaconda3/etc/profile.d/conda.sh"
-  else
-    . "$HOME/miniconda3/etc/profile.d/conda.sh"
-  fi
+  # The user is supposed to enable conda
+  # if [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+  #     . "$HOME/anaconda3/etc/profile.d/conda.sh"
+  # else
+  #   . "$HOME/miniconda3/etc/profile.d/conda.sh"
+  # fi
   conda activate alpaca
 
   echo "[INFO] Setting env variables..."
-  #ALPACA_DIR=$(dirname $(readlink -f $0))
+  # Getting the source directory in bash
   # https://stackoverflow.com/questions/59895/getting-the-source-directory-of-a-bash-script-from-within
   SOURCE="${BASH_SOURCE[0]}"
-  while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  while [ -h "$SOURCE" ]; do
     DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null && pwd )"
     SOURCE="$(readlink "$SOURCE")"
-    [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+    [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
   done
   export ALPACA_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null && pwd )"
 

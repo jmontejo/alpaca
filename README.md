@@ -24,12 +24,11 @@ Install with conda:
 ```
 conda env create -f alpaca_conda.yml
 ```
-*N.B. not yet tested with miniconda*
 
 
 Setup
 -----
-Just source `setup.sh`.
+Just source `setup.sh`. The script will activate the conda environment created at the previous step and set a few environmental variables.
 
 
 Start training!
