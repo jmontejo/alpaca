@@ -28,7 +28,10 @@ conda env create -f alpaca_conda.yml
 
 Setup
 -----
-Just source `setup.sh`. The script will activate the conda environment created at the previous step and set a few environmental variables.
+Just source `setup.sh`, the script will activate the conda environment created at the previous step and set a few environmental variables.
+```
+source setup.sh
+```
 
 
 Start training!
@@ -89,23 +92,8 @@ After running the model on an event, one can therefore attempt to reconstruct th
   3. The two highest scoring jets with the b-tag label are the b-jets.
 
 
-To use alpaca with conda (after you setup your conda environment with named `alpaca`):
-```bash
-$ source setup.sh conda
-$ alpaca -h
-```
-
-Usage example:
-
-```bash
-$ alpaca --sig /srv/beegfs/scratch/groups/dpnc/atlas/rpoggi/multijet/410471_6jexcl_2bjets_merged_mc_xs34.root --bkg /srv/beegfs/scratch/groups/dpnc/atlas/rpoggi/multijet/background_merged_a0b0_data_xs34.root
-```
-
-The results and a log file will be placed in an output directory (by default called `data`).
-
-
 Contributors
 ------------
-- Lukas Heinrich
 - Riccardo Poggi
 - Teng Jian Khoo
+- Lukas Heinrich
