@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import logging
+
 from pathlib import Path
 import datetime
 
@@ -8,9 +10,12 @@ import torch
 from progressbar import progressbar
 import matplotlib.pyplot as plt
 
-from alpaca.logging import log, logging, ff
+import alpaca.log
+
 from alpaca.batch import BatchManager
 
+
+log = logging.getLogger(__name__)
 
 if __name__ == '__main__':
     import argparse
@@ -55,18 +60,15 @@ if __name__ == '__main__':
         new_dir_name += "_altloss"
     new_dir_name += "_{}combos".format(args.ncombos)
     layerstr = '_'.join([str(i) for i in args.fflayers])
-    new_dir_name += "_"+layerstr
+    new_dir_name += "_" + layerstr
 
     output_dir = output_dir / new_dir_name
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    alpaca.log.setup_logger(file_path=output_dir / 'alpaca.log')
+    # from this point onwards you can log :)
+
     log.info('Writing to dir: %s', new_dir_name)
-
-    nfh = logging.FileHandler(str(output_dir / 'alpaca.log'))
-    nfh.setLevel(logging.DEBUG)
-    nfh.setFormatter(ff)
-    log.addHandler(nfh)
-
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     log.debug('Signal input: %s', args.sig)
     njets = 7

@@ -1,8 +1,11 @@
+import logging
+
 import pandas as pd
 import numpy as np
 import torch
 
-from alpaca.logging import log
+log = logging.getLogger(__name__)
+
 
 class BatchManager:
 
