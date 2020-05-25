@@ -2,6 +2,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import roc_curve, auc
 
+__all__ = ['plot_cola_weights', 'plot_hydra_weights', 'plot_roc_curve',
+           'plot_score_roc', 'plot_true_ISR', 'plot_index_ISR',
+           'plot_topmatch']
+
+
 def plot_cola_weights(model, output_dir):
         fig = plt.figure()
         plt.imshow(model.cola.w_combo.data.numpy())

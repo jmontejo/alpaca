@@ -1,8 +1,11 @@
 import torch
-from .feedforward import FeedForwardHead
+from alpaca.feedforward import FeedForwardHead
+
+__all__ = ['CoLa', 'LoLa', 'FeedForwardHead', 'CoLaLoLa']
 
 
 class CoLa(torch.nn.Module):
+
     def __init__(self, nobjects=15, ncombos=20):
         super(CoLa, self).__init__()
         self.nobjects = nobjects
@@ -22,6 +25,7 @@ class CoLa(torch.nn.Module):
 
 
 class LoLa(torch.nn.Module):
+
     def __init__(self, outputobj):
         super(LoLa, self).__init__()
         self.outputobj = outputobj
@@ -60,6 +64,7 @@ class LoLa(torch.nn.Module):
 
 
 class FeedForwardHead(torch.nn.Module):
+
     def __init__(self, sizes=None):
         super(FeedForwardHead, self).__init__()
         self.linears = torch.nn.ModuleList([torch.nn.Linear(sizes[i-1], sizes[i]) for i in range(1, len(sizes))])
@@ -76,6 +81,7 @@ class FeedForwardHead(torch.nn.Module):
 
 
 class CoLaLoLa(torch.nn.Module):
+
     def __init__(self, nobjects, ncombos, noutputs, fflayers=[200]):
         super(CoLaLoLa, self).__init__()
         self.ntotal = nobjects + ncombos

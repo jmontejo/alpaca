@@ -1,5 +1,7 @@
 import torch
 
+__all__ = ['FeedForwardHead']
+
 
 class FeedForwardHead(torch.nn.Module):
     def __init__(self, sizes=None):

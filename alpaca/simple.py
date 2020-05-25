@@ -1,8 +1,11 @@
 import torch
-from .feedforward import FeedForwardHead
+from alpaca.feedforward import FeedForwardHead
+
+__all__ = ['SimpleNN']
 
 
 class SimpleNN(torch.nn.Module):
+
     def __init__(self, nobjects, noutputs, fflayers=[200]):
         super(SimpleNN, self).__init__()
         self.ntotal = nobjects

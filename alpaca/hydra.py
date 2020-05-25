@@ -1,9 +1,14 @@
 import torch
-from .colalola import CoLa, LoLa
-from .feedforward import FeedForwardHead
 import numpy as np
 
+from alpaca.colalola import CoLa, LoLa
+from alpaca.feedforward import FeedForwardHead
+
+__all__ = ['IsrHead', 'DecayHead', 'Hydra']
+
+
 class IsrHead(torch.nn.Module):
+
     def __init__(self, njets, ncombos, fflayers=[200]):
         super(IsrHead, self).__init__()
         self.ntotal = njets + ncombos
@@ -22,6 +27,7 @@ class IsrHead(torch.nn.Module):
         return output
 
 class DecayHead(torch.nn.Module):
+
     def __init__(self, njets, ncombos, fflayers=[200]):
         super(DecayHead, self).__init__()
         self.ntotal = 6 + ncombos
@@ -45,6 +51,7 @@ class DecayHead(torch.nn.Module):
 # A NN with multiple output layers & heads
 # Technically now the components are no longer just separate heads... oops
 class Hydra(torch.nn.Module):
+
     def __init__(self, njets, ncombos, fflayers=[200]):
         super(Hydra, self).__init__()
         self.njets = njets
