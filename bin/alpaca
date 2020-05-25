@@ -69,15 +69,6 @@ if __name__ == '__main__':
     output_dir.mkdir(parents=True, exist_ok=True)
 
     log.debug('Signal input: %s', args.sig)
-<<<<<<< HEAD
-    log.debug('Background input: %s', args.bkg)
-    bm = BatchManager(sig_path=args.sig, bkg_path=args.bkg)
-
-    nobjects = 10#6
-    ncombos = 30
-    log.debug('CoLaLoLa: nr. jets %s - nr. combos %s', nobjects, ncombos)
-    model = CoLaLoLa(nobjects, ncombos)
-=======
     njets = 7
     bm = BatchManager(sig_path=args.sig, shuffle_jets=args.shuffle_jets, shuffle_events=args.shuffle_events, jets_per_event=njets, zero_jets=10-njets)
 
@@ -100,7 +91,6 @@ if __name__ == '__main__':
         log.info('CoLaLoLa: nr. jets %s - nr. combos %s', nobjects, args.ncombos)
         log.info('  FeedForwardHead intermediate layers: [%s]', layerstr.replace('_',','))
         model = CoLaLoLa(nobjects, args.ncombos, noutputs, fflayers=args.fflayers)
->>>>>>> khoo/alpaca-master
     opt = torch.optim.Adam(model.parameters())
     losses = {"total":[], "ISR":[], "decay":[], "bjet":[]}
     if args.alt_loss: losses.update({"penalty_ISR":[], "penalty_decay":[]})
@@ -116,19 +106,6 @@ if __name__ == '__main__':
         model.train()
         opt.zero_grad()
 
-<<<<<<< HEAD
-        X, Y = bm.get_torch_batch(batch_size, start_index=i * batch_size)
-        P, masses = model(X)
-        P, Y = P, Y.reshape(-1, 1)
-
-        loss = torch.nn.functional.binary_cross_entropy(P, Y)
-        losses.append(float(loss))
-        #if i % 25 == 0:
-        #    print(loss)
-        #    #plt.plot(losses)
-        #    #plt.show()
-        loss.backward()
-=======
         X, Y = bm.get_torch_batch(batch_size, nlabels=njets, start_index=i * batch_size+5000)
         P = model(X)
         Y = Y.reshape(-1, noutputs)
@@ -150,117 +127,14 @@ if __name__ == '__main__':
         for key, val in loss.items():
             losses[key].append(float(val))
         loss["total"].backward()
->>>>>>> khoo/alpaca-master
         opt.step()
 
     log.debug('Finished training')
     fig = plt.figure()
-<<<<<<< HEAD
-    plt.plot(losses)
-    plt.savefig(str(output_dir / 'losses.png'))
-
-    log.info('Save plot model')
-    fig = plt.figure()
-    plt.imshow(model.cola.w_combo.data.numpy())
-    plt.savefig(str(output_dir / 'w_combo.png'))
-
-    log.info('Make torch batch')
-    X,Y = bm.get_torch_batch(5000, nr_train * batch_size)
-    P, masses_sig = model(X)
-    _P = P.data.numpy()
-    _Y = Y.data.numpy()
-
-    #X,Y = bm.get_torch_batch(5000, nr_train * batch_size)
-    #X, Y = X[:5000], Y[:5000]
-    #P, masses_bkg = model(X)
-    #_P = P.data.numpy()
-    #_Y = Y.data.numpy()
-
-    #log.info('Plot mass histogram')
-    #fig = plt.figure()
-
-    #bins = np.linspace(0, 6000, 50)
-    #plt.hist(np.sqrt(np.abs(masses_bkg)) / 1000., bins=bins, histtype='step',
-    #         label='bkg')
-    #plt.hist(np.sqrt(np.abs(masses_sig)) / 1000., bins=bins, histtype='step',
-    #         label='signal')
-    #plt.yscale('log')
-    #plt.xscale('log')
-    #plt.xlabel('Mass [GeV]')
-    #plt.legend()
-    #plt.savefig(str(output_dir / 'masses.png'))
-
-    log.info('Feature Histogram')
-    _X = X.data.numpy()
-    pts = []
-    for i, score in enumerate(P):
-        if score > -1:
-            jets_lv = []
-            for jet_coo in _X[i]:
-                lv = uproot_methods.TLorentzVector(x=jet_coo[1],
-                                                   y=jet_coo[2],
-                                                   z=jet_coo[3],
-                                                   t=jet_coo[0])
-                jets_lv.append(lv)
-            jets_lv.sort(key=lambda x: x.pt, reverse=True)
-            pts.append(jets_lv[0].pt / 1000.)
-
-    fig = plt.figure()
-    plt.hist(pts, bins=1000, label='score > -1')
-    plt.xlabel('Leading Jet PT [GeV]')
-    plt.legend()
-    plt.savefig(str(output_dir / 'leading_pt.png'))
-
-
-    log.info('Plot Histograms')
-    fig = plt.figure()
-    plt.hist(_P[_Y==0],
-             bins = np.linspace(0, 1, 510),
-             label='bkg',
-             density=True,
-             histtype='step')
-    plt.hist(_P[_Y==1],
-             bins = np.linspace(0, 1, 510),
-             density=True,
-             label='sig',
-             histtype='step')
-    #plt.semilogy()
-    plt.legend()
-    plt.savefig(str(output_dir / 'score.png'))
-
-    log.info('Plot ROC curve')
-    fpr, tpr, thr = roc_curve(_Y, _P)
-    roc_auc = auc(fpr, tpr)
-    #print(len(fpr))
-    #print(max(fpr))
-    #print(fpr[-10:])
-    #print(len(_P))
-
-    fig = plt.figure()
-    plt.plot(fpr, tpr, color='darkorange',
-             label='ROC curve (area = {:.2f})'.format(roc_auc))
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    #plt.title('Receiver operating characteristic')
-    plt.legend(loc="lower right")
-    plt.savefig(str(output_dir / 'roc_curve.png'))
-
-    w = model.cola.w_combo.data.numpy()
-    fig = plt.figure()
-    plt.hist(X.data.numpy()[Y==0, :, 1].ravel(), bins=100)
-
-    plt.savefig(str(output_dir / 'ravel.png'))
-
-    X.data.numpy()[Y==0, :, 1]
-=======
     for losstype, lossvals in losses.items():
         plt.plot(lossvals,label=losstype)
     plt.legend()
     plt.savefig(str(output_dir / 'losses.png'))
->>>>>>> khoo/alpaca-master
 
     pred = {"ISR":{}, "ttbar":{}, "bjet":{}}
     truth = {"ISR":{}, "ttbar":{}, "bjet":{}}
