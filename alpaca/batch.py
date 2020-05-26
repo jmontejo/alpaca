@@ -4,6 +4,9 @@ import pandas as pd
 import numpy as np
 import torch
 
+__all__ = ['BatchManager']
+
+
 log = logging.getLogger(__name__)
 
 
@@ -11,15 +14,17 @@ class BatchManager:
 
     def __init__(self, sig_path, shuffle_jets=False, shuffle_events=False,
                  zero_jets=0, jets_per_event=10):
-        self._labeledjets = self.get_jets(sig_path, shuffle_jets,
+        self._labeledjets = self._get_jets(sig_path, shuffle_jets,
                                           shuffle_events, zero_jets,
                                           jets_per_event)
         log.info('Nr. of signal events: %s', len(self._labeledjets))
 
     @staticmethod
-    def get_jets(file_path, shuffle_jets=False, shuffle_events=False,
+    def _get_jets(file_path, shuffle_jets=False, shuffle_events=False,
                  zero_jets=0, jets_per_event=10):
-        """
+        """Function that reads an input file and returns a numpy array properly
+        formatted, ready to be converted to pytorch tensors.
+
         The returned object looks like this:
 
         [[[event 1 jet 1 t, event 1 jet 1 x, event 1 jet 1 y, event 1 jet 1 z, event 1 jet 1 partonindex]
@@ -60,6 +65,7 @@ class BatchManager:
         return jet_stack
 
     def get_torch_batch(self, N, nlabels, start_index=0):
+        """Function that returns pytorch tensors with a batch of events."""
         stop_index = start_index + N
         if stop_index > len(self._labeledjets):
             log.warning('The stop index is greater than the size of the array')
