@@ -1,8 +1,8 @@
 import torch
 import numpy as np
 
-from alpaca.colalola import CoLa, LoLa
-from alpaca.feedforward import FeedForwardHead
+from alpaca.nn.colalola import CoLa, LoLa
+from alpaca.nn.feedforward import FeedForwardHead
 
 __all__ = ['IsrHead', 'DecayHead', 'Hydra']
 

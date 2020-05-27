@@ -1,5 +1,6 @@
 import torch
-from alpaca.feedforward import FeedForwardHead
+
+from alpaca.nn.feedforward import FeedForwardHead
 
 __all__ = ['SimpleNN']
 

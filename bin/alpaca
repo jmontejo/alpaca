@@ -83,13 +83,13 @@ if __name__ == '__main__':
     ntobtag = 6
     noutputs = njets + ntomatch + ntobtag
     if args.simple_nn:
-        from alpaca.simple import SimpleNN
+        from alpaca.nn.simple import SimpleNN
         log.info('SimpleNN: nr. jets %s', njets)
         log.info('  FeedForwardHead intermediate layers: [%s]',
                  layerstr.replace('_', ','))
         model = SimpleNN(njets, noutputs, fflayers=args.fflayers)
     elif args.hydra:
-        from alpaca.hydra import Hydra
+        from alpaca.nn.hydra import Hydra
         log.info('CoLaLoLa with multiple heads: nr. jets %s - nr. combos %s',
                  njets, args.ncombos)
         log.info('  FeedForwardHead intermediate layers: [%s]',
@@ -97,7 +97,7 @@ if __name__ == '__main__':
         model = Hydra(njets, args.ncombos, fflayers=args.fflayers)
     else:
         # Plain CoLaLoLa as default
-        from alpaca.colalola import CoLaLoLa
+        from alpaca.nn.colalola import CoLaLoLa
         log.info('CoLaLoLa: nr. jets %s - nr. combos %s', njets,
                  args.ncombos)
         log.info('  FeedForwardHead intermediate layers: [%s]',
