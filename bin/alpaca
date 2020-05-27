@@ -16,7 +16,7 @@ from alpaca.batch import BatchManager
 
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
-log = logging.getLogger(__name__)
+log = logging.getLogger('alpaca')
 
 
 if __name__ == '__main__':
@@ -65,44 +65,44 @@ if __name__ == '__main__':
 
     alpaca.log.setup_logger(file_path=output_dir / 'alpaca.log')
     log.debug('Alpaca has been started and can finally log')
+    log.debug(args)
 
     log.info('Writing to dir: %s', new_dir_name)
 
     log.debug('Signal input: %s', args.sig)
     njets = 7
     bm = BatchManager(
-        sig_path=args.sig,
+        input_path=args.sig,
         shuffle_jets=args.shuffle_jets,
         shuffle_events=args.shuffle_events,
-        jets_per_event=njets,
-        zero_jets=10-njets
+        jets_per_event=njets
     )
+    log.info('Nr. of events: %s', bm.get_tot_events())
 
-    nobjects = njets
     ntomatch = 5
     ntobtag = 6
     noutputs = njets + ntomatch + ntobtag
     if args.simple_nn:
         from alpaca.simple import SimpleNN
-        log.info('SimpleNN: nr. jets %s', nobjects)
+        log.info('SimpleNN: nr. jets %s', njets)
         log.info('  FeedForwardHead intermediate layers: [%s]',
                  layerstr.replace('_', ','))
-        model = SimpleNN(nobjects, noutputs, fflayers=args.fflayers)
+        model = SimpleNN(njets, noutputs, fflayers=args.fflayers)
     elif args.hydra:
         from alpaca.hydra import Hydra
         log.info('CoLaLoLa with multiple heads: nr. jets %s - nr. combos %s',
-                 nobjects, args.ncombos)
+                 njets, args.ncombos)
         log.info('  FeedForwardHead intermediate layers: [%s]',
                  layerstr.replace('_', ','))
-        model = Hydra(nobjects, args.ncombos, fflayers=args.fflayers)
+        model = Hydra(njets, args.ncombos, fflayers=args.fflayers)
     else:
         # Plain CoLaLoLa as default
         from alpaca.colalola import CoLaLoLa
-        log.info('CoLaLoLa: nr. jets %s - nr. combos %s', nobjects,
+        log.info('CoLaLoLa: nr. jets %s - nr. combos %s', njets,
                  args.ncombos)
         log.info('  FeedForwardHead intermediate layers: [%s]',
                  layerstr.replace('_', ','))
-        model = CoLaLoLa(nobjects, args.ncombos, noutputs,
+        model = CoLaLoLa(njets, args.ncombos, noutputs,
                          fflayers=args.fflayers)
 
     opt = torch.optim.Adam(model.parameters())
@@ -112,8 +112,7 @@ if __name__ == '__main__':
 
     nr_train = 250
     batch_size = 250
-    log.debug('Training: %s iterations - batch size %s', nr_train, batch_size)
-
+    log.info('Training: %s iterations - batch size %s', nr_train, batch_size)
     for i in progressbar(range(nr_train)):
         model.train()
         opt.zero_grad()
@@ -145,6 +144,7 @@ if __name__ == '__main__':
         opt.step()
 
     log.debug('Finished training')
+
     fig = plt.figure()
     for losstype, lossvals in losses.items():
         plt.plot(lossvals, label=losstype)
@@ -154,6 +154,15 @@ if __name__ == '__main__':
     pred = {"ISR": {}, "ttbar": {}, "bjet": {}}
     truth = {"ISR": {}, "ttbar": {}, "bjet": {}}
     jets = {}
+
+    def partition_batch(Y, P, njets):
+        p = {}
+        y = {}
+        Y = Y.reshape(-1, noutputs)
+        p["ISR"], y["ISR"] = P[:, :njets], Y[:, :njets]
+        p["ttbar"], y["ttbar"] = P[:, njets:njets+5], Y[:, njets:njets+5]
+        p["bjet"], y["bjet"] = P[:, njets+5:], Y[:, njets+5:]
+        return y, p
 
     def fill_arrays(batch, label, model, filter_6j=False):
         X, Y = batch
@@ -201,11 +210,11 @@ if __name__ == '__main__':
     log.info(len(jets["Train"]))
 
     bm_6j = BatchManager(
-        sig_path=args.sig,
+        input_path=args.sig,
         shuffle_jets=args.shuffle_jets,
         shuffle_events=args.shuffle_events,
         jets_per_event=njets,
-        zero_jets=4
+        zero_jets=1 # padding one of the seven jet
     )
     log.info('Extracting sample of events with exactly 6 jets')
     # sample from the last events of the 39k 6-jet events
