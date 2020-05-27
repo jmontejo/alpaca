@@ -38,17 +38,18 @@ Start training!
 ---------------
 See the [Run 2 RPV Multijets twiki page](https://twiki.cern.ch/twiki/bin/view/AtlasProtected/RpvMultiJetFullRun2) for a test file on cernbox. To run after setting up the environment, do in a working directory:
 ```
-alpaca --sig truthmatched.h5
+alpaca --input-file truthmatched.h5
 ```
-Logs and plots will be written to subfolders in `data/`. For more information you can call `alpaca --help`.
+Logs and plots will be written to subdirectories in `data/`. For more information you can call `alpaca --help`.
 
 
 Package structure
 -----------------
-  - `alpaca/`: Contains modules defining different network architectures:
+  - `alpaca/nn/`: Contains modules defining different network architectures:
     - `simple.py`: Feed-forward network with a configurable number/size of hidden layers taking jet four-vectors as input
     - `colalola.py`: Lorentz-aware network with combination layer -- this first generates linear combinations of the four-vectors with trainable weights, then builds invariant masses and other Lorentz-invariants (some trainable) from the sums. The invariants are passed to a feed-forward network like the "simple" network. The number of combinations and the feed-forward hidden layer structure is configurable.
-  - `bin/`: Contains runnable scripts, currently only `alpaca`, which executes the network configuration, training and performance evaluation. Could stand to be made more modular :)
+  - `bin/`: Contains important executables that are added to your `$PATH`, currently only `alpaca`, which executes the network configuration, training and performance evaluation. Could stand to be made more modular :)
+  - `scripts/`: Contains utility scripts.
 
 
 Understanding the inputs and outputs
