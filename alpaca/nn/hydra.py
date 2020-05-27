@@ -26,6 +26,7 @@ class IsrHead(torch.nn.Module):
         output = self.head(output)
         return output
 
+
 class DecayHead(torch.nn.Module):
 
     def __init__(self, njets, ncombos, fflayers=[200]):
@@ -47,6 +48,7 @@ class DecayHead(torch.nn.Module):
         output = self.norm(output)
         output = self.head(output)
         return output
+
 
 # A NN with multiple output layers & heads
 # Technically now the components are no longer just separate heads... oops
