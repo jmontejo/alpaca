@@ -22,8 +22,8 @@ log = logging.getLogger('alpaca')
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='ML top-like tagger.')
-    parser.add_argument('--sig', required=True, type=Path,
-                        help='path to the file with sig events')
+    parser.add_argument('--input-file', '-i', required=True, type=Path,
+                        help='path to the file with the input events')
     parser.add_argument('--output-dir', type=Path, default=Path('data'),
                         help='path to the output directory')
     parser.add_argument('--tag', default='alpaca',
@@ -68,11 +68,11 @@ if __name__ == '__main__':
     log.debug(args)
 
     log.info('Writing to dir: %s', new_dir_name)
+    log.debug('Input file: %s', args.input_path)
 
-    log.debug('Signal input: %s', args.sig)
     njets = 7
     bm = BatchManager(
-        input_path=args.sig,
+        input_path=args.input_path,
         shuffle_jets=args.shuffle_jets,
         shuffle_events=args.shuffle_events,
         jets_per_event=njets
@@ -207,7 +207,7 @@ if __name__ == '__main__':
     log.info(len(jets["Train"]))
 
     bm_6j = BatchManager(
-        input_path=args.sig,
+        input_path=args.input_path,
         shuffle_jets=args.shuffle_jets,
         shuffle_events=args.shuffle_events,
         jets_per_event=njets,
