@@ -117,8 +117,7 @@ if __name__ == '__main__':
         model.train()
         opt.zero_grad()
 
-        X, Y = bm.get_torch_batch(batch_size, nlabels=njets,
-                                  start_index=i * batch_size + 5000)
+        X, Y = bm.get_torch_batch(batch_size, start_index=i * batch_size + 5000)
         P = model(X)
         Y = Y.reshape(-1, noutputs)
         P_ISR, Y_ISR = P[:, :njets], Y[:, :njets]
@@ -190,7 +189,6 @@ if __name__ == '__main__':
     fill_arrays(
         bm.get_torch_batch(
             5000,
-            nlabels=njets,
             start_index=(nr_train*batch_size)+5000
         ),
         "Test",
@@ -201,7 +199,6 @@ if __name__ == '__main__':
     fill_arrays(
         bm.get_torch_batch(
             5000,
-            nlabels=njets,
             start_index=5000
         ),
         "Train",
@@ -221,7 +218,6 @@ if __name__ == '__main__':
     fill_arrays(
         bm_6j.get_torch_batch(
             1500,
-            nlabels=njets,
             start_index=0
         ),
         "6-jet",

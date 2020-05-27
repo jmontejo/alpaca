@@ -101,7 +101,7 @@ class BatchManager:
 
         return jet_stack
 
-    def get_torch_batch(self, N, nlabels, start_index=0):
+    def get_torch_batch(self, N, start_index=0):
         """Function that returns pytorch tensors with a batch of events,
         specifically events in the range [start_index:start_index+N] from the
         input file.
@@ -120,7 +120,7 @@ class BatchManager:
         if stop_index > len(self._labeledjets):
             log.warning('The stop index is greater than the size of the array')
         jets = self._labeledjets[start_index:stop_index, :, :4]
-        labels = np.array(self._labeledjets[start_index:stop_index, :nlabels, -1:].squeeze(), dtype=int)
+        labels = np.array(self._labeledjets[start_index:stop_index, :, -1:].squeeze(), dtype=int)
 
         # Convert the parton labels to bools that the network can make sense of
         # is the jet from the ttbar system?
@@ -141,11 +141,16 @@ class BatchManager:
         # isbjet = np.array( [ np.equal(r,1) | np.equal(r,4) for r in labels] )
         # jetlabels = np.concatenate([jetfromttbar.squeeze(),topmatch[:,1:],isbjet],1)
 
-        # Check that the encoded events have the expected number of positive labels
+        # Check that the encoded events have the expected number of positive
+        # labels. This cleanup is a consequence of the truth matching script
+        # that created the input, so this next bit makes sure that the labels
+        # conform to the expectations we have for training, 6 top jets, 2 more
+        # to complete top1 and 2 b-jets.
         def good_labels(r):
-            return (r[:nlabels].sum() == 6) and \
-                   (r[nlabels:nlabels+5].sum() == 2) and \
-                   (r[nlabels+5:].sum() == 2)
+            njets = self._labeledjets.shape[1]
+            return (r[:njets].sum() == 6) and \
+                   (r[njets:njets+5].sum() == 2) and \
+                   (r[njets+5:].sum() == 2)
         jets_clean = np.array([r for r, t in zip(jets, jetlabels)
                                if good_labels(t)])
         jetlabels_clean = np.array([r for r in jetlabels if good_labels(r)])
