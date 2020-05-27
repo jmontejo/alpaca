@@ -66,18 +66,18 @@ if __name__ == '__main__':
     alpaca.log.setup_logger(file_path=output_dir / 'alpaca.log')
     log.debug('Alpaca has been started and can finally log')
     log.debug(args)
+    log.debug('Input file: %s', args.input_file)
 
     log.info('Writing to dir: %s', new_dir_name)
-    log.debug('Input file: %s', args.input_path)
 
     njets = 7
     bm = BatchManager(
-        input_path=args.input_path,
+        input_path=args.input_file,
         shuffle_jets=args.shuffle_jets,
         shuffle_events=args.shuffle_events,
         jets_per_event=njets
     )
-    log.info('Nr. of events: %s', bm.get_tot_events())
+    log.info('Nr. of events: %s', bm.get_nr_events())
 
     ntomatch = 5
     ntobtag = 6
@@ -154,15 +154,6 @@ if __name__ == '__main__':
     truth = {"ISR": {}, "ttbar": {}, "bjet": {}}
     jets = {}
 
-    def partition_batch(Y, P, njets):
-        p = {}
-        y = {}
-        Y = Y.reshape(-1, noutputs)
-        p["ISR"], y["ISR"] = P[:, :njets], Y[:, :njets]
-        p["ttbar"], y["ttbar"] = P[:, njets:njets+5], Y[:, njets:njets+5]
-        p["bjet"], y["bjet"] = P[:, njets+5:], Y[:, njets+5:]
-        return y, p
-
     def fill_arrays(batch, label, model, filter_6j=False):
         X, Y = batch
         if filter_6j:
@@ -207,7 +198,7 @@ if __name__ == '__main__':
     log.info(len(jets["Train"]))
 
     bm_6j = BatchManager(
-        input_path=args.input_path,
+        input_path=args.input_file,
         shuffle_jets=args.shuffle_jets,
         shuffle_events=args.shuffle_events,
         jets_per_event=njets,

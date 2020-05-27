@@ -15,7 +15,7 @@ class BatchManager:
     def __init__(self, input_path, shuffle_jets=False, shuffle_events=False,
                  jets_per_event=10, zero_jets=0):
         """Refer to the documentation of the private method `_get_jets`."""
-        self._labeledjets = self._get_jets(
+        labeledjets = self._get_jets(
             input_path=input_path,
             shuffle_jets=shuffle_jets,
             shuffle_events=shuffle_events,
@@ -23,9 +23,53 @@ class BatchManager:
             zero_jets=zero_jets
         )
 
+        # The rest of this method is about parsing the partonindex labels to
+        # to derive the truth labels that can be used by the NN.
+        # At the end there is also additional sanitisation of the input files
+        # which removes some events.
+
+        jets = labeledjets[:, :, :4]
+        labels = np.array(labeledjets[:, :, -1:].squeeze(), dtype=int)
+
+        # Convert the parton labels to bools that the network can make sense of
+        # is the jet from the ttbar system?
+        jetfromttbar = labels > 0
+        # is the jet associated with the top quark?
+        # Disregard the jets that are from ISR
+        # Account for charge ambiguity by identifying whether the
+        # jets match the leading jet or not
+        maskedlabels = np.ma.masked_where(jetfromttbar == False, labels)
+        nonisrlabels = np.array([r.compressed() for r in maskedlabels])
+        topmatch = np.array([r > 3 if r[0] > 3 else r <= 3 for r in nonisrlabels])
+        isbjet = np.array([np.equal(r, 1) | np.equal(r, 4) for r in nonisrlabels])
+        jetlabels = np.concatenate([jetfromttbar, topmatch[:, 1:], isbjet], 1)
+        # Substitute this line for the preceding if only doing the 6 top jets
+        # Not currently configurable by command line because it's a bit more
+        # complicated overall + less often changed
+        # topmatch = np.array( [ r>3 if r[0]>3 else r<3 for r in labels] )
+        # isbjet = np.array( [ np.equal(r,1) | np.equal(r,4) for r in labels] )
+        # jetlabels = np.concatenate([jetfromttbar.squeeze(),topmatch[:,1:],isbjet],1)
+
+        # Check that the encoded events have the expected number of positive
+        # labels. This cleanup is a consequence of the truth matching script
+        # that created the input, so this next bit makes sure that the labels
+        # conform to the expectations we have for training, 6 top jets, 2 more
+        # to complete top1 and 2 b-jets.
+        def good_labels(r):
+            njets = self._labeledjets.shape[1]
+            return (r[:njets].sum() == 6) and \
+                   (r[njets:njets+5].sum() == 2) and \
+                   (r[njets+5:].sum() == 2)
+        jets_clean = np.array([r for r, t in zip(jets, jetlabels)
+                               if good_labels(t)])
+        jetlabels_clean = np.array([r for r in jetlabels if good_labels(r)])
+
+        self._jets = jets_clean
+        self._jetlabels = jetlabels_clean
+
     @staticmethod
     def _get_jets(input_path, shuffle_jets=False, shuffle_events=False,
-                 jets_per_event=10, zero_jets=0):
+                  jets_per_event=10, zero_jets=0):
         """Function that reads an input file and returns a numpy array properly
         formatted, ready to be converted to pytorch tensors.
 
@@ -64,8 +108,8 @@ class BatchManager:
         are the four coordinates of the TLorentz vector: t, x, y, z; plus a
         truth-based parton label that is an integer number betwwen 0 and 6
         (0 = not top jet, 1-3 = b,Wa,Wb from top, 4-6 ditto from antitop).
-        """
 
+        """
         df = pd.read_hdf(input_path, "df")
         # Get the number of jets per event in the input file by inspecting the
         # second level index of one of the columns
@@ -103,13 +147,11 @@ class BatchManager:
 
     def get_torch_batch(self, N, start_index=0):
         """Function that returns pytorch tensors with a batch of events,
-        specifically events in the range [start_index:start_index+N] from the
-        input file.
+        specifically events in the range [start_index:start_index + N].
 
         Args:
             N: the number of events to return
-            nlabels: ??
-            start_index: starting index of the file
+            start_index: starting index of the internal array
 
         Return:
             (X, Y): X is in the input to the pytorch model and Y is the truth
@@ -117,47 +159,14 @@ class BatchManager:
 
         """
         stop_index = start_index + N
-        if stop_index > len(self._labeledjets):
+        if stop_index > self.get_nr_events():
             log.warning('The stop index is greater than the size of the array')
-        jets = self._labeledjets[start_index:stop_index, :, :4]
-        labels = np.array(self._labeledjets[start_index:stop_index, :, -1:].squeeze(), dtype=int)
-
-        # Convert the parton labels to bools that the network can make sense of
-        # is the jet from the ttbar system?
-        jetfromttbar = labels > 0
-        # is the jet associated with the top quark?
-        # Disregard the jets that are from ISR
-        # Account for charge ambiguity by identifying whether the
-        # jets match the leading jet or not
-        maskedlabels = np.ma.masked_where(jetfromttbar == False, labels)
-        nonisrlabels = np.array([r.compressed() for r in maskedlabels])
-        topmatch = np.array([r > 3 if r[0] > 3 else r <= 3 for r in nonisrlabels])
-        isbjet = np.array([np.equal(r, 1) | np.equal(r, 4) for r in nonisrlabels])
-        jetlabels = np.concatenate([jetfromttbar, topmatch[:, 1:], isbjet], 1)
-        # Substitute this line for the preceding if only doing the 6 top jets
-        # Not currently configurable by command line because it's a bit more
-        # complicated overall + less often changed
-        # topmatch = np.array( [ r>3 if r[0]>3 else r<3 for r in labels] )
-        # isbjet = np.array( [ np.equal(r,1) | np.equal(r,4) for r in labels] )
-        # jetlabels = np.concatenate([jetfromttbar.squeeze(),topmatch[:,1:],isbjet],1)
-
-        # Check that the encoded events have the expected number of positive
-        # labels. This cleanup is a consequence of the truth matching script
-        # that created the input, so this next bit makes sure that the labels
-        # conform to the expectations we have for training, 6 top jets, 2 more
-        # to complete top1 and 2 b-jets.
-        def good_labels(r):
-            njets = self._labeledjets.shape[1]
-            return (r[:njets].sum() == 6) and \
-                   (r[njets:njets+5].sum() == 2) and \
-                   (r[njets+5:].sum() == 2)
-        jets_clean = np.array([r for r, t in zip(jets, jetlabels)
-                               if good_labels(t)])
-        jetlabels_clean = np.array([r for r in jetlabels if good_labels(r)])
-
-        X = torch.as_tensor(jets_clean, dtype=torch.float)
-        Y = torch.as_tensor(jetlabels_clean, dtype=torch.float)
+        X = torch.as_tensor(self._jets[start_index:stop_index, :], dtype=torch.float)
+        Y = torch.as_tensor(self._jetlabels[start_index:stop_index, :], dtype=torch.float)
         return X, Y
 
-    def get_tot_events(self):
-        return len(self._labeledjets)
+    def get_nr_events(self):
+        """Return the length of the internal array which holds all the events.
+        """
+        # self._jets and self._jetslabels should have the same length
+        return len(self._jets)
