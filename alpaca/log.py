@@ -15,9 +15,9 @@ def setup_logger(file_path=None):
 
     # file handler
     if file_path is not None:
-        fh = logging.FileHandler(str(file_path))
+        fh = logging.FileHandler(file_path, mode='w')
         fh.setLevel(logging.DEBUG)
-        ff = logging.Formatter('[%(asctime)s] %(levelname)s :: %(message)s')
+        ff = logging.Formatter('[%(asctime)s] %(levelname)s :: %(name)s :: %(message)s')
         fh.setFormatter(ff)
         root_logger.addHandler(fh)
 
