@@ -56,7 +56,7 @@ class BatchManager:
         # conform to the expectations we have for training, 6 top jets, 2 more
         # to complete top1 and 2 b-jets.
         def good_labels(r):
-            njets = self._labeledjets.shape[1]
+            njets = labeledjets.shape[1]
             return (r[:njets].sum() == 6) and \
                    (r[njets:njets+5].sum() == 2) and \
                    (r[njets+5:].sum() == 2)
