@@ -43,7 +43,7 @@ if __name__ == '__main__':
     parser.add_argument("--ncombos", type=int, default=30)
     args = parser.parse_args()
 
-    # Autogenerate meaningful names for output dir
+    # Autogenerate meaningful names for outputf dir
     output_dir = args.output_dir
     new_dir_name = args.tag
     if args.shuffle_jets:
@@ -79,9 +79,7 @@ if __name__ == '__main__':
     )
     log.info('Nr. of events: %s', bm.get_nr_events())
 
-    ntomatch = 5
-    ntobtag = 6
-    noutputs = njets + ntomatch + ntobtag
+    noutputs = njets*3
     if args.simple_nn:
         from alpaca.nn.simple import SimpleNN
         log.info('SimpleNN: nr. jets %s', njets)
@@ -120,9 +118,9 @@ if __name__ == '__main__':
         X, Y = bm.get_torch_batch(batch_size, start_index=i * batch_size + 5000)
         P = model(X)
         Y = Y.reshape(-1, noutputs)
-        P_ISR, Y_ISR = P[:, :njets], Y[:, :njets]
-        P_decay, Y_decay = P[:, njets:njets+5], Y[:, njets:njets+5]
-        P_bjet, Y_bjet = P[:, njets+5:], Y[:, njets+5:]
+        P_ISR, Y_ISR = P[:, :njets], Y[:, :njets] #njets flags for ISR or not
+        P_decay, Y_decay = P[:, njets:njets*2], Y[:, njets:njets*2]
+        P_bjet, Y_bjet = P[:, njets*2:njets*3], Y[:, njets*2:njets*3]
 
         loss = {
             "ISR": torch.nn.functional.binary_cross_entropy(P_ISR, Y_ISR),
