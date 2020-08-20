@@ -38,11 +38,11 @@ class BatchManager:
         # Disregard the jets that are from ISR
         # Account for charge ambiguity by identifying whether the
         # jets match the leading jet or not
-        maskedlabels = np.ma.masked_where(jetfromttbar == False, labels)
-        nonisrlabels = np.array([r.compressed() for r in maskedlabels])
-        topmatch = np.array([r > 3 if r[0] > 3 else r <= 3 for r in nonisrlabels])
-        isbjet = np.array([np.equal(r, 1) | np.equal(r, 4) for r in nonisrlabels])
-        jetlabels = np.concatenate([jetfromttbar, topmatch[:, 1:], isbjet], 1)
+        topmatch = labels  > 3
+        dummy1 = labels <=3
+        dummymatch = dummy1 & jetfromttbar
+        isbjet = np.array([np.equal(r, 1) | np.equal(r, 4) for r in labels])
+        jetlabels = np.concatenate([jetfromttbar, topmatch, dummymatch, isbjet], 1)
         # Substitute this line for the preceding if only doing the 6 top jets
         # Not currently configurable by command line because it's a bit more
         # complicated overall + less often changed
@@ -58,8 +58,9 @@ class BatchManager:
         def good_labels(r):
             njets = labeledjets.shape[1]
             return (r[:njets].sum() == 6) and \
-                   (r[njets:njets+5].sum() == 2) and \
-                   (r[njets+5:].sum() == 2)
+                   (r[njets:njets*2].sum() == 3) and \
+                   (r[njets*2:njets*3].sum() == 3) and \
+                   (r[njets*3:].sum() == 2)
         jets_clean = np.array([r for r, t in zip(jets, jetlabels)
                                if good_labels(t)])
         jetlabels_clean = np.array([r for r in jetlabels if good_labels(r)])
@@ -76,7 +77,7 @@ class BatchManager:
         Args:
             file_path: path to the input file
 
-            shuffule_jets: if set to `True` for each event the jets are
+            shuffle_jets: if set to `True` for each event the jets are
                 shuffled, so that if they were pT ordered they will not be
                 anymore
 

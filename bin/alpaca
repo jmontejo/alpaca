@@ -79,9 +79,7 @@ if __name__ == '__main__':
     )
     log.info('Nr. of events: %s', bm.get_nr_events())
 
-    ntomatch = 5
-    ntobtag = 6
-    noutputs = njets + ntomatch + ntobtag
+    noutputs = njets*4
     if args.simple_nn:
         from alpaca.nn.simple import SimpleNN
         log.info('SimpleNN: nr. jets %s', njets)
@@ -106,7 +104,7 @@ if __name__ == '__main__':
                          fflayers=args.fflayers)
 
     opt = torch.optim.Adam(model.parameters())
-    losses = {"total": [], "ISR": [], "decay": [], "bjet": []}
+    losses = {"total": [], "ISR": [], "ttbar": [], "lep1top": [], "had0top": []}
     if args.alt_loss:
         losses.update({"penalty_ISR": [], "penalty_decay": []})
 
@@ -120,22 +118,24 @@ if __name__ == '__main__':
         X, Y = bm.get_torch_batch(batch_size, start_index=i * batch_size + 5000)
         P = model(X)
         Y = Y.reshape(-1, noutputs)
-        P_ISR, Y_ISR = P[:, :njets], Y[:, :njets]
-        P_decay, Y_decay = P[:, njets:njets+5], Y[:, njets:njets+5]
-        P_bjet, Y_bjet = P[:, njets+5:], Y[:, njets+5:]
+        P_ISR, Y_ISR = P[:, :njets], Y[:, :njets] #njets flags for ISR or not
+        P_ttbar, Y_ttbar = P[:, njets:njets*2], Y[:, njets:njets*2]
+        P_lep1top, Y_lep1top = P[:, njets*2:njets*3], Y[:, njets*2:njets*3]
+        P_had0top, Y_had0top = P[:, njets*3:njets*4], Y[:, njets*3:njets*4]
 
         loss = {
             "ISR": torch.nn.functional.binary_cross_entropy(P_ISR, Y_ISR),
-            "decay": torch.nn.functional.binary_cross_entropy(P_decay, Y_decay),
-            "bjet": torch.nn.functional.binary_cross_entropy(P_bjet, Y_bjet),
+            "ttbar": torch.nn.functional.binary_cross_entropy(P_ttbar, Y_ttbar),
+            "lep1top": torch.nn.functional.binary_cross_entropy(P_lep1top, Y_lep1top),
+            "had0top": torch.nn.functional.binary_cross_entropy(P_had0top, Y_had0top),
         }
-        loss["total"] = loss["ISR"] + loss["decay"] + loss["bjet"]
+        loss["total"] = loss["ISR"] + loss["ttbar"]+ loss["lep1top"] + loss["had0top"]
         if args.alt_loss:
             loss["penalty_ISR"] = P_ISR[Y_ISR == 0].mean() + \
                                   (1 - P_ISR[Y_ISR == 1]).mean()
-            loss["penalty_decay"] = P_decay[Y_decay == 0].mean() + \
-                                    (1 - P_decay[Y_decay == 1]).mean()
-            loss["total"] += loss["penalty_ISR"] + loss["penalty_decay"]
+            loss["penalty_ttbar"] = P_ttbar[Y_ttbar == 0].mean() + \
+                                    (1 - P_ttbar[Y_ttbar == 1]).mean()
+            loss["total"] += loss["penalty_ISR"] + loss["penalty_ttbar"]
 
         for key, val in loss.items():
             losses[key].append(float(val))
@@ -150,8 +150,8 @@ if __name__ == '__main__':
     plt.legend()
     plt.savefig(str(output_dir / 'losses.png'))
 
-    pred = {"ISR": {}, "ttbar": {}, "bjet": {}}
-    truth = {"ISR": {}, "ttbar": {}, "bjet": {}}
+    pred  = {"ISR": {}, "ttbar": {}, "lep1top": {}, "had0top": {}}
+    truth = {"ISR": {}, "ttbar": {}, "lep1top": {}, "had0top": {}}
     jets = {}
 
     def fill_arrays(batch, label, model, filter_6j=False):
@@ -169,12 +169,14 @@ if __name__ == '__main__':
         p = model(X).data.numpy()
         # Alternatively, can split up the model output
         pred["ISR"][label] = p[:, :njets]
-        pred["ttbar"][label] = p[:, njets:njets+5]
-        pred["bjet"][label] = p[:, njets+5:]
+        pred["ttbar"][label] = p[:, njets:njets*2]
+        pred["lep1top"][label] = p[:, njets*2:njets*3]
+        pred["had0top"][label] = p[:, njets*3:njets*4]
         #
-        truth["ISR"][label] = y[:, :njets]
-        truth["ttbar"][label] = y[:, njets:njets+5]
-        truth["bjet"][label] = y[:, njets+5:]
+        truth["ISR"][label]   = y[:, :njets]
+        truth["ttbar"][label] = y[:, njets:njets*2]
+        truth["lep1top"][label]  = y[:, njets*2:njets*3]
+        truth["had0top"][label] = y[:, njets*3:njets*4]
 
     log.info('Extracting test sample')
     fill_arrays(
@@ -220,7 +222,7 @@ if __name__ == '__main__':
     flatdict = {}
     for sample in ["Test", "Train", "6-jet"]:
         flatdict["jets_{}".format(sample)] = jets[sample]
-        for discr in ["ISR", "ttbar", "bjet"]:
+        for discr in ["ISR", "ttbar", "lep1top","had0top"]:
             flatdict["pred_{}_{}".format(discr, sample)] = pred[discr][sample]
             flatdict["truth_{}_{}".format(discr, sample)] = truth[discr][sample]
     np.savez(str(output_dir / "data.npz"), **flatdict)
@@ -235,24 +237,35 @@ if __name__ == '__main__':
     else:
         plot_cola_weights(model, output_dir)
 
-    log.info('Plot scores and ROC curves for top/tbar matching')
+    log.info('Plot scores and ROC curves for ttbar matching')
     plot_score_roc(
         pred,
         truth,
         "ttbar",
         output_dir,
-        plotlabels=("Same decay as leading", "Different decay from leading"),
-        irange=range(5)
+        plotlabels=("Jets matched to leading lepton", "Jets not matched to leading lepton"),
+        irange=range(njets)
     )
 
-    log.info('Plot scores and ROC curves for b-jet identification')
+
+    log.info('Plot scores and ROC curves for lep1top identification')
     plot_score_roc(
         pred,
         truth,
-        "bjet",
+        "lep1top",
         output_dir,
-        plotlabels=("b-jet", "W decay jet"),
-        irange=range(6)
+        plotlabels=("Jets matched to subleading lepton", "Jets not matched to subleading lepton"),
+        irange=range(njets)
+    )
+
+    log.info('Plot scores and ROC curves for had0top identification')
+    plot_score_roc(
+        pred,
+        truth,
+        "had0top",
+        output_dir,
+        plotlabels=("Jets matched to hadronic top", "Jets not matched to hadronic top"),
+        irange=range(njets)
     )
 
     log.info('Plot scores for jets from tops 1 and 2')
