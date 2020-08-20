@@ -144,6 +144,16 @@ class BatchManager:
             for row in jet_stack:
                 np.random.shuffle(row)
 
+        #jet_stack_pt = np.sqrt(jet_stack[:, :, 0]**2+jet_stack[:, :, 1]**2)
+        #print(jet_stack_pt.shape)
+        #print(np.ones(jet_stack[:, :,0].shape).shape)
+        #print(np.maximum(jet_stack_pt,np.ones(jet_stack[:, :,0].shape)))
+        #jet_stack_eta = np.arcsinh(jet_stack[:, :, 2]/np.maximum(jet_stack_pt,np.ones(jet_stack[:, :,0].shape)))
+        #jet_stack_phi = np.arctan(jet_stack[:, :, 1]/np.maximum(jet_stack[:, :, 0],np.ones(jet_stack[:, :,0].shape)))
+        #jet_stack[:, :, 0] = jet_stack_pt
+        #jet_stack[:, :, 1] = jet_stack_eta
+        #jet_stack[:, :, 2] = jet_stack_phi
+
         return jet_stack
 
     def get_torch_batch(self, N, start_index=0):
