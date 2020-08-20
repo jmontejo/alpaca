@@ -71,6 +71,7 @@ def plot_true_ISR(pred, truth, output_dir):
         max_ISRjet = np.array([p[t==0].max() for t,p in zip(truth["ISR"][sample],pred["ISR"][sample])])
         plt.hist(max_ISRjet, label=sample, **histargs)
     plt.legend()
+    plt.xlabel('Highest non-ISR output for ISR jets in the event')
     plt.savefig(str(output_dir / 'score_max_ISR.png'))
     plt.close()
 
@@ -79,14 +80,17 @@ def plot_true_ISR(pred, truth, output_dir):
         min_topjet = np.array([p[t==1].min() for t,p in zip(truth["ISR"][sample],pred["ISR"][sample])])
         plt.hist(min_topjet, label=sample, **histargs)
     plt.legend()
+    plt.xlabel('Lowest non-ISR output for non-ISR jets in the event')
     plt.savefig(str(output_dir / 'score_min_topjet.png'))
     plt.close()
 
     fig = plt.figure()
+    histargs["range"]=(-1,1)
     for sample in ["Test","Train","6-jet"]:
         diff_ISR = np.array([p[t==1].min() - p[t==0].max() for t,p in zip(truth["ISR"][sample],pred["ISR"][sample])])
         plt.hist(diff_ISR, label=sample, **histargs)
     plt.legend()
+    plt.xlabel('Difference between lowest output for non-ISR jets and highest output for ISR jets in the event')
     plt.savefig(str(output_dir / 'score_diff_ISR.png'))
     plt.close()
 
@@ -98,6 +102,7 @@ def plot_index_ISR(pred, truth, output_dir):
         plt.hist(truth["ISR"][sample].argmin(1), label='True ({})'.format(sample),
                  alpha=0.5, fill=True, **histargs)
     plt.legend(loc="upper center")
+    plt.xlabel('Minimum index for non-ISR jets in the event')
     plt.savefig(str(output_dir / 'argmin.png'))
     plt.close()
 

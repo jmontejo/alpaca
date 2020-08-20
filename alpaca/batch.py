@@ -181,12 +181,17 @@ class BatchManager2HDM (BatchManager): #need to include lepton 4-vectors, MET
         # to derive the truth labels that can be used by the NN.
         # At the end there is also additional sanitisation of the input files
         # which removes some events.
-        jets = labeledjets[:, :, :4] #drop parton index, keep 4-vector
+        jetsize = 5
+        jets = labeledjets[:, :, :jetsize] #drop parton index, keep 4-vector + bjet
+        print("BatchManager2HDM",jets_per_event,zero_jets,jets[:5,:,0])
+
         labels = np.array(labeledjets[:, :, -1:].squeeze(), dtype=int) #only parton index
         lep0 = rest[:,:4]
+        lep0 = np.concatenate([lep0,np.zeros([len(lep0),1])],axis=1)
         lep1 = rest[:,4:8]
+        lep1 = np.concatenate([lep1,np.zeros([len(lep1),1])],axis=1)
         met  = rest[:,8:]
-        met  = np.concatenate([met,np.zeros([len(met),2])],axis=1)
+        met  = np.concatenate([met,np.zeros([len(met),3])],axis=1)
 
         def myjetlabels(labels):
             myisr = [j==0 for j in labels]
@@ -221,18 +226,22 @@ class BatchManager2HDM (BatchManager): #need to include lepton 4-vectors, MET
             )
 
 
-        #KEEP ALL EVENTS
-        #leadingNincludealltop = - df[[("partonindex", i) for i in range(jets_per_event - zero_jets, tot_jets_per_event)]].any(axis=1)
-        #leadingNarenonzero = df[[("jet_e", i) for i in range(jets_per_event - zero_jets)]].all(axis=1) #complicated cut on at least N jets
-        #df = df[leadingNincludealltop & leadingNarenonzero]
+        # Select only those events in which
+        # - a top jet is not going to be cut, by checking that among the
+        #    remaining jets after the Nth there aren't any (note the minus sign)
+        # - the leading jets are all existent
+        leadingNarenonzero = df[[("jet_e", i) for i in range(jets_per_event - zero_jets)]].all(axis=1) #complicated cut on at least N jets
+        df = df[leadingNarenonzero]
 
         if shuffle_events:
             df.reindex(np.random.permutation(df.index))
 
         # The input rows have all jet px, all jet py, ... all jet partonindex
         # So segment and swap axes to group by jet
-        jet_vars = ['jet_pt','jet_eta','jet_phi','jet_e','jet_partonindex']
+        jet_vars = ['jet_pt','jet_eta','jet_phi','jet_e','jet_dl1r','jet_partonindex']
         rest_vars = ['lep0_pt','lep0_eta', 'lep0_phi','lep0_e','lep1_pt','lep1_eta', 'lep1_phi','lep1_e','met','met_phi']
+        #jet_vars = ['jet_px','jet_py','jet_pz','jet_e','jet_dl1r','jet_partonindex']
+        #rest_vars = ['lep0_px','lep0_py', 'lep0_pz','lep0_e','lep1_px','lep1_py', 'lep1_pz','lep1_e','met_px','met_py','met_pz','met_e']
         maxjets = 8
         #assert len(jet_vars)*2==len(rest_vars) #I'm abusing two leading slots for lep+met
         jet_df = df[jet_vars]
