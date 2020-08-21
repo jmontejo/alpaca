@@ -191,7 +191,7 @@ class BatchManager2HDM (BatchManager): #need to include lepton 4-vectors, MET
         lep1 = rest[:,4:8]
         lep1 = np.concatenate([lep1,np.zeros([len(lep1),1])],axis=1)
         met  = rest[:,8:]
-        met  = np.concatenate([met,np.zeros([len(met),3])],axis=1)
+        met  = np.concatenate([met,np.zeros([len(met),1])],axis=1)
 
         def myjetlabels(labels):
             myisr = [j==0 for j in labels]
@@ -238,10 +238,10 @@ class BatchManager2HDM (BatchManager): #need to include lepton 4-vectors, MET
 
         # The input rows have all jet px, all jet py, ... all jet partonindex
         # So segment and swap axes to group by jet
-        jet_vars = ['jet_pt','jet_eta','jet_phi','jet_e','jet_dl1r','jet_partonindex']
-        rest_vars = ['lep0_pt','lep0_eta', 'lep0_phi','lep0_e','lep1_pt','lep1_eta', 'lep1_phi','lep1_e','met','met_phi']
-        #jet_vars = ['jet_px','jet_py','jet_pz','jet_e','jet_dl1r','jet_partonindex']
-        #rest_vars = ['lep0_px','lep0_py', 'lep0_pz','lep0_e','lep1_px','lep1_py', 'lep1_pz','lep1_e','met_px','met_py','met_pz','met_e']
+        #jet_vars = ['jet_pt','jet_eta','jet_phi','jet_e','jet_dl1r','jet_partonindex']
+        #rest_vars = ['lep0_pt','lep0_eta', 'lep0_phi','lep0_e','lep1_pt','lep1_eta', 'lep1_phi','lep1_e','met','met_phi']
+        jet_vars = ['jet_px','jet_py','jet_pz','jet_e','jet_dl1r','jet_partonindex']
+        rest_vars = ['lep0_px','lep0_py', 'lep0_pz','lep0_e','lep1_px','lep1_py', 'lep1_pz','lep1_e','met_px','met_py','met_pz','met_e']
         maxjets = 8
         #assert len(jet_vars)*2==len(rest_vars) #I'm abusing two leading slots for lep+met
         jet_df = df[jet_vars]

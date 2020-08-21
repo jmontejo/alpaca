@@ -109,24 +109,24 @@ if __name__ == '__main__':
                         help='path to the npz file out of alpaca')
     args = parser.parse_args()
 
-    dataset_nobfixed = 'user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS36_R21_allhad_resolved.root'
+    #dataset_nobfixed = 'user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS36_R21_allhad_resolved.root'
     dataset_bfixed = 'user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS34_R21_allhad_resolved.root'
 
-    no_bfixed = get_base_events(list((args.xsttbar_dir / dataset_nobfixed).glob('*.root')))
+    #no_bfixed = get_base_events(list((args.xsttbar_dir / dataset_nobfixed).glob('*.root')))
     bfixed = get_base_events(list((args.xsttbar_dir / dataset_bfixed).glob('*.root')))
 
 
     fig = plt.figure()
     bins_chi = np.linspace(0, 40, 400)
-    plt.hist(no_bfixed['reco_Chi2Fitted'], bins=bins_chi, histtype='step',
-             label='$\chi^2$ no bfixed')
+    #plt.hist(no_bfixed['reco_Chi2Fitted'], bins=bins_chi, histtype='step',
+    #         label='$\chi^2$ no bfixed')
     plt.hist(bfixed['reco_Chi2Fitted'], bins=bins_chi, histtype='step',
-             label='$\chi^2$ no bfixed')
+             label='$\chi^2$ bfixed')
     plt.legend()
     plt.grid()
-    plt.show()
+    plt.savefig('chi2_dist.png')
 
-    no_bfixed = no_bfixed[no_bfixed['reco_Chi2Fitted'] < 10]
+    #no_bfixed = no_bfixed[no_bfixed['reco_Chi2Fitted'] < 10]
     bfixed = bfixed[bfixed['reco_Chi2Fitted'] < 10]
 
 
@@ -134,8 +134,8 @@ if __name__ == '__main__':
 
     fig = plt.figure()
     bins_m = np.linspace(0, 500, 100)
-    plt.hist(no_bfixed['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
-             label='$\chi^2 < 10$ no bfixed', density=True)
+    #plt.hist(no_bfixed['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
+    #         label='$\chi^2 < 10$ no bfixed', density=True)
     plt.hist(bfixed['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
              label='$\chi^2 < 10$ bfixed', density=True)
     plt.hist(tj_top1, bins=bins_m, histtype='step', label='Top 1 (pred)',
@@ -143,7 +143,7 @@ if __name__ == '__main__':
     plt.xlabel('$t_1$ mass [GeV]')
     plt.legend()
     plt.grid()
-    plt.show()
+    plt.savefig('mass_dist.png')
 
     #truth = uproot.lazyarrays(
     #    input_files,

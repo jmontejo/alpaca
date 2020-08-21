@@ -34,7 +34,9 @@ class LoLa(torch.nn.Module):
                                                      self.outputobj))
         self.w_ener = torch.nn.Parameter(torch.randn(self.outputobj,
                                                      self.outputobj))
-        self.w_pid = torch.nn.Parameter(torch.randn(self.outputobj,
+        self.w_pid  = torch.nn.Parameter(torch.randn(self.outputobj,
+                                                    self.outputobj))
+        self.w_dl1r = torch.nn.Parameter(torch.randn(self.outputobj,
                                                     self.outputobj))
         self.metric = torch.diag(torch.tensor([-1., -1., -1., 1.]))
 
@@ -43,7 +45,9 @@ class LoLa(torch.nn.Module):
     # corresponding combinations
     def forward(self, combvec):
         weighted_e = torch.einsum('ij,bj->bi', self.w_ener,combvec[:, :, 0]) #linear combination of energies?
-        weighted_p = torch.einsum('ij,bj->bi', self.w_pid,combvec[:, :, -1]) #linear combination of pz?
+        weighted_p = torch.einsum('ij,bj->bi', self.w_pid,combvec[:, :, 3]) #linear combination of pz?
+        #weighted_dl1r = torch.einsum('ij,bj->bi', self.w_dl1r,combvec[:, :, 4]) #linear combination of dl1r
+
 
         a = combvec[..., :4].unsqueeze(2).repeat(1, 1, self.outputobj, 1)
         b = combvec[..., :4].unsqueeze(1).repeat(1, self.outputobj, 1, 1)
@@ -57,9 +61,10 @@ class LoLa(torch.nn.Module):
         outputs = torch.stack([
             masses,
             ptsq,
-            #weighted_e,
+            weighted_e,
             weighted_d,
-            #weighted_p,
+            weighted_p,
+            #weighted_dl1r,
         ], dim=-1)
         return outputs
 
@@ -71,8 +76,8 @@ class CoLaLoLa(torch.nn.Module):
         self.ntotal = nobjects + ncombos
         self.cola = CoLa(nobjects, ncombos)
         self.lola = LoLa(self.ntotal)
-        self.norm = torch.nn.BatchNorm1d(self.ntotal * 3)
-        self.head = FeedForwardHead([self.ntotal * 3] + fflayers + [noutputs])
+        self.norm = torch.nn.BatchNorm1d(self.ntotal * 5)
+        self.head = FeedForwardHead([self.ntotal * 5] + fflayers + [noutputs])
 
     def forward(self, vectors):
         output = self.cola(vectors)
