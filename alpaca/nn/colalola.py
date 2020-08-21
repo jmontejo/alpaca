@@ -57,9 +57,9 @@ class LoLa(torch.nn.Module):
         outputs = torch.stack([
             masses,
             ptsq,
-            #weighted_e,
+            weighted_e,
             weighted_d,
-            #weighted_p,
+            weighted_p,
         ], dim=-1)
         return outputs
 
@@ -71,8 +71,8 @@ class CoLaLoLa(torch.nn.Module):
         self.ntotal = nobjects + ncombos
         self.cola = CoLa(nobjects, ncombos)
         self.lola = LoLa(self.ntotal)
-        self.norm = torch.nn.BatchNorm1d(self.ntotal * 3)
-        self.head = FeedForwardHead([self.ntotal * 3] + fflayers + [noutputs])
+        self.norm = torch.nn.BatchNorm1d(self.ntotal * 5)
+        self.head = FeedForwardHead([self.ntotal * 5] + fflayers + [noutputs])
 
     def forward(self, vectors):
         output = self.cola(vectors)
