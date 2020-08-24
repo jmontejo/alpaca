@@ -23,17 +23,121 @@ def get_base_events(input_files):
 def minv(a):
     return np.sqrt(a[:,3]**2 - a[:,2]**2 - a[:,1]**2 - a[:,0]**2)
 
+from functools import lru_cache
 
-def tj_distr(npz_file):
-  data = np.load(npz_file)
+@lru_cache(maxsize=32)
+def generatePerms(n):
+    from itertools import permutations,combinations
+    sixes = list(combinations(range(n),6))
+    triplets = []
+    for six in sixes:
+        bpairs = list(combinations(six,2))
+        for bpair in bpairs:
+            lights = [ jet for jet in six if jet not in bpair ]
+            triplet1 = (bpair[0],lights[0],lights[1])
+            triplet2 = (bpair[1],lights[2],lights[3])
+            triplets.append((triplet1,triplet2))
+            triplet1 = (bpair[0],lights[2],lights[3])
+            triplet2 = (bpair[1],lights[0],lights[1])
+            triplets.append((triplet1,triplet2))
+            triplet1 = (bpair[0],lights[0],lights[3])
+            triplet2 = (bpair[1],lights[1],lights[2])
+            triplets.append((triplet1,triplet2))
+            triplet1 = (bpair[0],lights[1],lights[2])
+            triplet2 = (bpair[1],lights[0],lights[3])
+            triplets.append((triplet1,triplet2))
+            triplet1 = (bpair[0],lights[0],lights[2])
+            triplet2 = (bpair[1],lights[1],lights[3])
+            triplets.append((triplet1,triplet2))
+            triplet1 = (bpair[0],lights[1],lights[3])
+            triplet2 = (bpair[1],lights[0],lights[2])
+            triplets.append((triplet1,triplet2))
+    return triplets
 
-  for sample in ["Test","Train"]:#,"6-jet"]:
-    sample = "6-jet"
+
+def generateTripletsNoBtag(jetlist):
+    perms = generatePerms(len(jetlist))
+    #triplets = []
+    for p in perms:
+        yield ((jetlist[p[0][0]], jetlist[p[0][1]], jetlist[p[0][2]]),(jetlist[p[1][0]], jetlist[p[1][1]], jetlist[p[1][2]] ))
+        #triplets.append( [jetlist[x] for sublist in p for x in sublist] )
+    #return triplets
+
+def arrayM(a):
+    from math import sqrt
+    return sqrt(a[0]**2-a[1]**2-a[2]**2+a[3]**2)
+
+def arrayPt(a):
+    from math import sqrt
+    return sqrt(a[0]**2+a[1]**2)
+
+
+def evalChi2(triplet1,triplet2):
+    sigma_mbjj = 10.7
+    sigma_mjj = 5.9
+    mW = 80.4
+
+    mjj1 = arrayM((triplet1[1]+triplet1[2]))
+    mjj2 = arrayM((triplet2[1]+triplet2[2]))
+
+    mbjj1 = arrayM((triplet1[0]+triplet1[1]+triplet1[2]))
+    mbjj2 = arrayM((triplet2[0]+triplet2[1]+triplet2[2]))
+
+    dmbjj = (mbjj1-mbjj2)
+    dmjj1 = (mjj1-mW)
+    dmjj2 = (mjj2-mW)
+
+    chi2 = dmbjj*dmbjj/(sigma_mbjj*sigma_mbjj) + dmjj1*dmjj1/(sigma_mjj*sigma_mjj) + dmjj2*dmjj2/(sigma_mjj*sigma_mjj)
+    return chi2
+
+def evalPerm(triplets):
+    chi2min = 1e12
+    for triplet1,triplet2 in triplets:
+        chi2 = evalChi2(triplet1,triplet2)
+        if chi2<chi2min:
+            chi2min = chi2
+            #
+            top1 = (triplet1[0]+triplet1[1]+triplet1[2])
+            top2 = (triplet2[0]+triplet2[1]+triplet2[2])
+            b1 = triplet1[0]
+            b2 = triplet2[0]
+            W1 = (triplet1[1]+triplet1[2])
+            W2 = (triplet2[1]+triplet2[2])
+            #
+            if arrayPt(top1)>arrayPt(top2):
+                besttop1 = top1
+                bestW1 = W1
+                besttop2 = top2
+                bestW2 = W2
+            else:
+                besttop1 = top2
+                bestW1 = W2
+                besttop2 = top1
+    return np.array([chi2min, arrayM(besttop1)])
+
+def eval_chi2(jets):
+    tripletsNoBtag =  np.array(list(map(generateTripletsNoBtag,jets)))
+    results = np.vstack(np.array(list(map(evalPerm,tripletsNoBtag))))
+    return results[:,0], results[:,1]
+
+def tj_distr(npz_file, dochi2=False):
+    data = np.load(npz_file)
+
+    sample = "Test" #"6-jet"
     jets = data["jets_{}".format(sample)]*1e-3 # Convert to GeV
-    cut = jets[:,:,3].min(axis=1)>=0 #right now not cutting at all
+    nevents = len(jets)
+    #lead10 = np.concatenate([np.ones(4),np.zeros(nevents-4)])
+    #print(lead10[:12])
+    cut = jets[:,:,3].min(axis=1)>=0 #can cut on exactly 6 jets using ==0
+    #cut = cut & lead10.astype(np.bool)
     jets = jets[cut]
     nevents = len(jets)
     njets = jets.shape[1]
+    if dochi2:
+        chi2, mass = eval_chi2(jets)
+    else:
+        chi2 = np.zeros(nevents)
+        mass = np.zeros(nevents)
 
     # Plot truth jet mass distribution
     ISR_truth = data["truth_ISR_{}".format(sample)]
@@ -79,7 +183,7 @@ def tj_distr(npz_file):
     jets_top2_pred = jets_ttbar_pred[~ttbar_pred.astype(np.bool)].reshape(nevents,3,4)
     minv_top1_pred = minv(jets_top1_pred.sum(1))
     minv_top2_pred = minv(jets_top2_pred.sum(1))
-    yield minv_top1_pred
+    return minv_top1_pred, chi2, mass
 
     # for i in range(10):
     #     print('\n\n',i)
@@ -115,6 +219,8 @@ if __name__ == '__main__':
                               'dataset'))
     parser.add_argument('--npz', type=Path,
                         help='path to the npz file out of alpaca')
+    parser.add_argument('--do-chi2', action="store_true",
+                    help='Compute chi2 and compare against it')
     args = parser.parse_args()
 
     dataset_nobfixed = 'user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS36_R21_allhad_resolved.root'
@@ -138,7 +244,8 @@ if __name__ == '__main__':
     bfixed = bfixed[bfixed['reco_Chi2Fitted'] < 10]
 
 
-    tj_top1 = np.concatenate(list(tj_distr(args.npz)))
+    tj_top1, chi2, chi2mass = tj_distr(args.npz, args.do_chi2)
+    chi2mass_skim = chi2mass[chi2<10]
 
     fig = plt.figure()
     bins_m = np.linspace(0, 500, 100)
@@ -147,6 +254,10 @@ if __name__ == '__main__':
     plt.hist(bfixed['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
              label='$\chi^2 < 10$ bfixed', density=True)
     plt.hist(tj_top1, bins=bins_m, histtype='step', label='Top 1 (pred)',
+             density=True)
+    plt.hist(chi2mass, bins=bins_m, histtype='step', label='Top 1 (my chi2)',
+             density=True)
+    plt.hist(chi2mass_skim, bins=bins_m, histtype='step', label='Top 1 (my chi2 < 10)',
              density=True)
     plt.xlabel('$t_1$ mass [GeV]')
     plt.legend()
