@@ -120,10 +120,11 @@ def eval_chi2(jets):
     results = np.vstack(np.array(list(map(evalPerm,tripletsNoBtag))))
     return results[:,0], results[:,1]
 
-def tj_distr(npz_file, dochi2=False):
+def tj_distr(npz_file, dochi2=False, sample=None):
     data = np.load(npz_file)
 
-    sample = "Test" #"6-jet"
+    if not sample:
+        sample = "6-jet"
     jets = data["jets_{}".format(sample)]*1e-3 # Convert to GeV
     nevents = len(jets)
     #lead10 = np.concatenate([np.ones(4),np.zeros(nevents-4)])
@@ -139,20 +140,20 @@ def tj_distr(npz_file, dochi2=False):
         chi2 = np.zeros(nevents)
         mass = np.zeros(nevents)
 
-    # Plot truth jet mass distribution
-    ISR_truth = data["truth_ISR_{}".format(sample)]
-    ISR_truth = ISR_truth[cut]
-    ttbar_truth = data["truth_ttbar_{}".format(sample)]
-    ttbar_truth = ttbar_truth[cut]
-    # Add a 1 for the leading jet
-    ttbar_truth = np.concatenate([np.ones([nevents,1]),ttbar_truth],1)
-    # Mask out ISR jets
-    jets_ttbar_truth = jets[ISR_truth.astype(np.bool)].reshape(nevents,6,4)
-    # Mask out the jets from each of the tops
-    jets_top1_truth = jets_ttbar_truth[ttbar_truth.astype(np.bool)].reshape(nevents,3,4)
-    jets_top2_truth = jets_ttbar_truth[~ttbar_truth.astype(np.bool)].reshape(nevents,3,4)
-    minv_top1_truth = minv(jets_top1_truth.sum(1))
-    minv_top2_truth = minv(jets_top2_truth.sum(1))
+    # # Plot truth jet mass distribution
+    # ISR_truth = data["truth_ISR_{}".format(sample)]
+    # ISR_truth = ISR_truth[cut]
+    # ttbar_truth = data["truth_ttbar_{}".format(sample)]
+    # ttbar_truth = ttbar_truth[cut]
+    # # Add a 1 for the leading jet
+    # ttbar_truth = np.concatenate([np.ones([nevents,1]),ttbar_truth],1)
+    # # Mask out ISR jets
+    # jets_ttbar_truth = jets[ISR_truth.astype(np.bool)].reshape(nevents,6,4)
+    # # Mask out the jets from each of the tops
+    # jets_top1_truth = jets_ttbar_truth[ttbar_truth.astype(np.bool)].reshape(nevents,3,4)
+    # jets_top2_truth = jets_ttbar_truth[~ttbar_truth.astype(np.bool)].reshape(nevents,3,4)
+    # minv_top1_truth = minv(jets_top1_truth.sum(1))
+    # minv_top2_truth = minv(jets_top2_truth.sum(1))
 
     # Plot network-labeled jet mass distribution
     ISR_pred_score = data["pred_ISR_{}".format(sample)]
@@ -221,6 +222,8 @@ if __name__ == '__main__':
                         help='path to the npz file out of alpaca')
     parser.add_argument('--do-chi2', action="store_true",
                     help='Compute chi2 and compare against it')
+    parser.add_argument('--output-dir', type=Path,
+                        help='path to the output directory')
     args = parser.parse_args()
 
     dataset_nobfixed = 'user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS36_R21_allhad_resolved.root'
@@ -230,22 +233,27 @@ if __name__ == '__main__':
     bfixed = get_base_events(list((args.xsttbar_dir / dataset_bfixed).glob('*.root')))
 
 
+    no_bfixed = no_bfixed[no_bfixed['reco_Chi2Fitted'] < 10]
+    bfixed = bfixed[bfixed['reco_Chi2Fitted'] < 10]
+
+    tj_top1_allp, chi2, chi2mass = tj_distr(args.npz, sample="Test")
+    tj_top1, chi2, chi2mass = tj_distr(args.npz, args.do_chi2, sample="6-jet")
+    chi2mass_skim = chi2mass[chi2<10]
+
+
     fig = plt.figure()
     bins_chi = np.linspace(0, 40, 400)
+    bins_chi_coarse = np.linspace(0, 40, 80)
+
     plt.hist(no_bfixed['reco_Chi2Fitted'], bins=bins_chi, histtype='step',
              label='$\chi^2$ no bfixed')
     plt.hist(bfixed['reco_Chi2Fitted'], bins=bins_chi, histtype='step',
              label='$\chi^2$ bfixed')
+    plt.hist(chi2, bins=bins_chi_coarse, histtype='step',
+             label='$\chi^2$ mine')
     plt.legend()
     plt.grid()
-    plt.savefig('chi2_dist.png')
-
-    no_bfixed = no_bfixed[no_bfixed['reco_Chi2Fitted'] < 10]
-    bfixed = bfixed[bfixed['reco_Chi2Fitted'] < 10]
-
-
-    tj_top1, chi2, chi2mass = tj_distr(args.npz, args.do_chi2)
-    chi2mass_skim = chi2mass[chi2<10]
+    plt.savefig(args.output_dir / 'chi2_dist.png')
 
     fig = plt.figure()
     bins_m = np.linspace(0, 500, 100)
@@ -253,16 +261,16 @@ if __name__ == '__main__':
              label='$\chi^2 < 10$ no bfixed', density=True)
     plt.hist(bfixed['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
              label='$\chi^2 < 10$ bfixed', density=True)
-    plt.hist(tj_top1, bins=bins_m, histtype='step', label='Top 1 (pred)',
+    plt.hist(tj_top1_allp, bins=bins_m, histtype='step', label='Top 1 (NN pred) all partons in sample',
              density=True)
-    plt.hist(chi2mass, bins=bins_m, histtype='step', label='Top 1 (my chi2)',
+    plt.hist(tj_top1, bins=bins_m, histtype='step', label='Top 1 (NN pred) no extra parton cut',
              density=True)
-    plt.hist(chi2mass_skim, bins=bins_m, histtype='step', label='Top 1 (my chi2 < 10)',
+    plt.hist(chi2mass_skim, bins=bins_m, histtype='step', label='Top 1 (my chi2 < 10) no extra parton cut',
              density=True)
     plt.xlabel('$t_1$ mass [GeV]')
     plt.legend()
     plt.grid()
-    plt.savefig('mass_dist.png')
+    plt.savefig(args.output_dir / 'mass_dist.png')
 
     #truth = uproot.lazyarrays(
     #    input_files,

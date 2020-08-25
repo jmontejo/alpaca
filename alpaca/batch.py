@@ -13,14 +13,15 @@ log = logging.getLogger(__name__)
 class BatchManager:
 
     def __init__(self, input_path, shuffle_jets=False, shuffle_events=False,
-                 jets_per_event=10, zero_jets=0):
+                 jets_per_event=10, zero_jets=0, all_partons_included=True):
         """Refer to the documentation of the private method `_get_jets`."""
         labeledjets = self._get_jets(
             input_path=input_path,
             shuffle_jets=shuffle_jets,
             shuffle_events=shuffle_events,
             jets_per_event=jets_per_event,
-            zero_jets=zero_jets
+            zero_jets=zero_jets,
+            all_partons_included=all_partons_included,
         )
 
         # The rest of this method is about parsing the partonindex labels to
@@ -30,6 +31,11 @@ class BatchManager:
 
         jets = labeledjets[:, :, :4]
         labels = np.array(labeledjets[:, :, -1:].squeeze(), dtype=int)
+
+        if all_partons_included==False:
+            self._jets = jets
+            self._jetlabels = np.zeros((len(jets),jets_per_event+11))
+            return
 
         # Convert the parton labels to bools that the network can make sense of
         # is the jet from the ttbar system?
@@ -55,21 +61,22 @@ class BatchManager:
         # that created the input, so this next bit makes sure that the labels
         # conform to the expectations we have for training, 6 top jets, 2 more
         # to complete top1 and 2 b-jets.
-        def good_labels(r):
+        def good_labels(r,all_partons_included):
+            if not all_partons_included: return True
             njets = labeledjets.shape[1]
             return (r[:njets].sum() == 6) and \
                    (r[njets:njets+5].sum() == 2) and \
                    (r[njets+5:].sum() == 2)
         jets_clean = np.array([r for r, t in zip(jets, jetlabels)
-                               if good_labels(t)])
-        jetlabels_clean = np.array([r for r in jetlabels if good_labels(r)])
+                               if good_labels(t,all_partons_included)])
+        jetlabels_clean = np.array([r for r in jetlabels if good_labels(r,all_partons_included)])
 
         self._jets = jets_clean
         self._jetlabels = jetlabels_clean
 
     @staticmethod
     def _get_jets(input_path, shuffle_jets=False, shuffle_events=False,
-                  jets_per_event=10, zero_jets=0):
+                  jets_per_event=10, zero_jets=0, all_partons_included=True):
         """Function that reads an input file and returns a numpy array properly
         formatted, ready to be converted to pytorch tensors.
 
@@ -126,9 +133,12 @@ class BatchManager:
         # - a top jet is not going to be cut, by checking that among the
         #    remaining jets after the Nth there aren't any (note the minus sign)
         # - the leading jets are all existent
-        leadingNincludealltop = - df[[("partonindex", i) for i in range(jets_per_event - zero_jets, tot_jets_per_event)]].any(axis=1)
+        leadingNincludealltop = - df[[("partonindex", i) for i in range(jets_per_event, tot_jets_per_event)]].any(axis=1) #not "- zero_jets" this would make the last jet always ISR
         leadingNarenonzero = df[[("jet_e", i) for i in range(jets_per_event - zero_jets)]].all(axis=1)
-        df = df[leadingNincludealltop & leadingNarenonzero]
+        if all_partons_included:
+            df = df[leadingNincludealltop & leadingNarenonzero]
+        else:
+            df = df[leadingNarenonzero]
 
         if shuffle_events:
             df.reindex(np.random.permutation(df.index))

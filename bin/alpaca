@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import logging
+import os
 
 from pathlib import Path
 import datetime
@@ -75,7 +76,8 @@ if __name__ == '__main__':
         input_path=args.input_file,
         shuffle_jets=args.shuffle_jets,
         shuffle_events=args.shuffle_events,
-        jets_per_event=njets
+        jets_per_event=njets,
+        zero_jets=1,
     )
     log.info('Nr. of events: %s', bm.get_nr_events())
 
@@ -202,13 +204,14 @@ if __name__ == '__main__':
         shuffle_jets=args.shuffle_jets,
         shuffle_events=args.shuffle_events,
         jets_per_event=njets,
-        zero_jets=1 # padding one of the seven jet
+        zero_jets=1, # padding one of the seven jet
+        all_partons_included=False,
     )
     log.info('Extracting sample of events with exactly 6 jets')
     # sample from the last events of the 39k 6-jet events
     fill_arrays(
         bm_6j.get_torch_batch(
-            1500,
+            5000,
             start_index=0
         ),
         "6-jet",
@@ -224,6 +227,10 @@ if __name__ == '__main__':
             flatdict["pred_{}_{}".format(discr, sample)] = pred[discr][sample]
             flatdict["truth_{}_{}".format(discr, sample)] = truth[discr][sample]
     np.savez(str(output_dir / "data.npz"), **flatdict)
+
+
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --do-chi2 --output-dir {out}".format(out=output_dir)
+    os.system(cmd)
 
     from alpaca.plot import *
     log.info('Plot combination weights')
