@@ -66,7 +66,7 @@ for nom_df, truth_df, truth_eventN_df in zip(nom_iter,truth_iter,truth_eventN_it
     # Reshape the df to have one event per row,
     # filling each overflow entry with 0's
     # Extract just the cartesian coordinates and the parton index
-    jet_cartesian = ["jet_"+comp for comp in ["px","py","pz","e"]]
+    jet_cartesian = ["jet_"+comp for comp in ["e","px","py","pz"]]
     unstacked_df = filtered_df[jet_cartesian+["partonindex"]].unstack(fill_value=0)
 
     # Write out to an hdf5 file
