@@ -133,8 +133,16 @@ class BatchManager:
         # - a top jet is not going to be cut, by checking that among the
         #    remaining jets after the Nth there aren't any (note the minus sign)
         # - the leading jets are all existent
-        leadingNincludealltop = - df[[("partonindex", i) for i in range(jets_per_event, tot_jets_per_event)]].any(axis=1) #not "- zero_jets" this would make the last jet always ISR
+        #leadingNincludealltop = - df[[("partonindex", i) for i in range(jets_per_event, tot_jets_per_event)]].any(axis=1) #not "- zero_jets" this would make the last jet always ISR
+        leadingNincludealltop = (df[[("partonindex", i) for i in range(jets_per_event)]]>0).sum(1) ==6
         leadingNarenonzero = df[[("jet_e", i) for i in range(jets_per_event - zero_jets)]].all(axis=1)
+
+        #exactlyleadingNarenonzero = - df[[("jet_e", i) for i in range(jets_per_event, tot_jets_per_event)]].any(axis=1) #not "- zero_jets" this would make the last jet always ISR
+        #if all_partons_included:
+        #    df = df[leadingNincludealltop & leadingNarenonzero & exactlyleadingNarenonzero]
+        #else:
+        #    df = df[leadingNarenonzero & exactlyleadingNarenonzero]
+
         if all_partons_included:
             df = df[leadingNincludealltop & leadingNarenonzero]
         else:
@@ -147,6 +155,18 @@ class BatchManager:
         # So segment and swap axes to group by jet
         jet_stack = np.swapaxes(df.values.reshape(len(df), 5, 10), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
+
+        #Reverse to intuitive order
+        jet_e = np.copy(jet_stack[:, :, 0])
+        jet_px = jet_stack[:, :, 1]
+        jet_py = jet_stack[:, :, 2]
+        jet_pz = jet_stack[:, :, 3]
+        jet_stack[:, :, 0] = jet_px
+        jet_stack[:, :, 1] = jet_py
+        jet_stack[:, :, 2] = jet_pz
+        jet_stack[:, :, 3] = jet_e
+
+
         if shuffle_jets:
             # shuffle only does the outermost level
             # iterate through rows to shuffle each event individually

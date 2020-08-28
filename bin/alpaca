@@ -229,7 +229,8 @@ if __name__ == '__main__':
     np.savez(str(output_dir / "data.npz"), **flatdict)
 
 
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --do-chi2 --output-dir {out}".format(out=output_dir)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --do-chi2 --output-dir {out}".format(out=output_dir)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out}".format(out=output_dir)
     os.system(cmd)
 
     from alpaca.plot import *

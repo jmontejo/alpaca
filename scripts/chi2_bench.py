@@ -17,6 +17,7 @@ def get_base_events(input_files):
 
     sel = nominal
     sel = sel[sel['jet_pt'].counts >= 6]
+    #sel = sel[sel['jet_pt'].counts <= 7]
     sel = sel[sel['jet_pt'].min() > 25000.]
     return sel
 
@@ -56,6 +57,7 @@ def generatePerms(n):
 
 
 def generateTripletsNoBtag(jetlist):
+    while jetlist[-1,3]==0: jetlist = jetlist[:-1]
     perms = generatePerms(len(jetlist))
     #triplets = []
     for p in perms:
@@ -65,7 +67,9 @@ def generateTripletsNoBtag(jetlist):
 
 def arrayM(a):
     from math import sqrt
-    return sqrt(a[0]**2-a[1]**2-a[2]**2+a[3]**2)
+    m = sqrt(-a[0]**2-a[1]**2-a[2]**2+a[3]**2)
+    assert m>0, a
+    return m
 
 def arrayPt(a):
     from math import sqrt
@@ -73,8 +77,10 @@ def arrayPt(a):
 
 
 def evalChi2(triplet1,triplet2):
-    sigma_mbjj = 10.7
-    sigma_mjj = 5.9
+    #sigma_mbjj = 10.7 #check also factor 2 below
+    #sigma_mjj = 5.9
+    sigma_mbjj = 17.6
+    sigma_mjj = 9.3
     mW = 80.4
 
     mjj1 = arrayM((triplet1[1]+triplet1[2]))
@@ -87,7 +93,7 @@ def evalChi2(triplet1,triplet2):
     dmjj1 = (mjj1-mW)
     dmjj2 = (mjj2-mW)
 
-    chi2 = dmbjj*dmbjj/(sigma_mbjj*sigma_mbjj) + dmjj1*dmjj1/(sigma_mjj*sigma_mjj) + dmjj2*dmjj2/(sigma_mjj*sigma_mjj)
+    chi2 = dmbjj*dmbjj/(2*sigma_mbjj*sigma_mbjj) + dmjj1*dmjj1/(sigma_mjj*sigma_mjj) + dmjj2*dmjj2/(sigma_mjj*sigma_mjj)
     return chi2
 
 def evalPerm(triplets):
@@ -127,12 +133,18 @@ def tj_distr(npz_file, dochi2=False, sample=None):
         sample = "6-jet"
     jets = data["jets_{}".format(sample)]*1e-3 # Convert to GeV
     nevents = len(jets)
+    print("Npz file has ",nevents)
+
     #lead10 = np.concatenate([np.ones(4),np.zeros(nevents-4)])
     #print(lead10[:12])
     cut = jets[:,:,3].min(axis=1)>=0 #can cut on exactly 6 jets using ==0
+    #    if not (jets[5].Pt()*GeV>55): continue
+
     #cut = cut & lead10.astype(np.bool)
     jets = jets[cut]
     nevents = len(jets)
+    print("Npz file after cut has ",nevents)
+
     njets = jets.shape[1]
     if dochi2:
         chi2, mass = eval_chi2(jets)
@@ -213,6 +225,25 @@ def tj_distr(npz_file, dochi2=False, sample=None):
 
 
 if __name__ == '__main__':
+
+    # jets_etaphi = [[ 97242.921 , 0.6877870 , -1.628724 , 121789.06],
+    #         [ 91254.734 , -0.077293 , 2.6106293 , 91859.867],
+    #         [ 86505.171 , -1.494373 , 0.4952870 , 202573.29],
+    #         [ 71843.148 , 0.2761235 , -2.958802 , 75055.796],
+    #         [     71331 , -0.861143 , 1.8417986 ,     99926],
+    #         [ 60377.855 , -1.335611 , -0.644344 , 122985.21],
+    #        ]
+    # jets_etaphi = np.ndarray((6,4),buffer=np.array(jets_etaphi))
+    # jets = np.copy(jets_etaphi)
+    # jets[:,0] = jets_etaphi[:,0]*np.cos(jets_etaphi[:,2])
+    # jets[:,1] = jets_etaphi[:,0]*np.sin(jets_etaphi[:,2])
+    # jets[:,2] = jets_etaphi[:,0]*np.sinh(jets_etaphi[:,1])
+    # jets = jets*1e-3
+    # tripletsNoBtag =  generateTripletsNoBtag(jets)
+    # results = evalPerm(tripletsNoBtag)
+    # print(results)
+    # sys.exit(1)
+
     import argparse
     parser = argparse.ArgumentParser(description='Chi2 benchmark.')
     parser.add_argument('--xsttbar-dir', required=True, type=Path,
@@ -233,27 +264,33 @@ if __name__ == '__main__':
     bfixed = get_base_events(list((args.xsttbar_dir / dataset_bfixed).glob('*.root')))
 
 
-    no_bfixed = no_bfixed[no_bfixed['reco_Chi2Fitted'] < 10]
-    bfixed = bfixed[bfixed['reco_Chi2Fitted'] < 10]
-
-    tj_top1_allp, chi2, chi2mass = tj_distr(args.npz, sample="Test")
-    tj_top1, chi2, chi2mass = tj_distr(args.npz, args.do_chi2, sample="6-jet")
-    chi2mass_skim = chi2mass[chi2<10]
-
+    tj_top1, unused1, unused2 = tj_distr(args.npz, sample="Test")
+    tj_top1_notallp, chi2, chi2mass = tj_distr(args.npz, args.do_chi2, sample="6-jet")
 
     fig = plt.figure()
     bins_chi = np.linspace(0, 40, 400)
-    bins_chi_coarse = np.linspace(0, 40, 80)
+    bins_chi_coarse = np.linspace(0, 40, 40)
 
     plt.hist(no_bfixed['reco_Chi2Fitted'], bins=bins_chi, histtype='step',
              label='$\chi^2$ no bfixed')
     plt.hist(bfixed['reco_Chi2Fitted'], bins=bins_chi, histtype='step',
              label='$\chi^2$ bfixed')
-    plt.hist(chi2, bins=bins_chi_coarse, histtype='step',
-             label='$\chi^2$ mine')
+    if args.do_chi2:
+        factor = len(bfixed['reco_Chi2Fitted'])/len(chi2)/10
+        print("My chi2 scale factor",factor)
+        plt.hist(chi2, bins=bins_chi_coarse, histtype='step',
+             label='$\chi^2$ mine', weights=np.ones_like(chi2)*factor)
     plt.legend()
     plt.grid()
-    plt.savefig(args.output_dir / 'chi2_dist.png')
+    if args.do_chi2:
+        plt.savefig(args.output_dir / 'chi2_dist_withmychi2.png')
+    else:
+        plt.savefig(args.output_dir / 'chi2_dist.png')
+
+
+    no_bfixed = no_bfixed[no_bfixed['reco_Chi2Fitted'] < 10]
+    bfixed = bfixed[bfixed['reco_Chi2Fitted'] < 10]
+    chi2mass_skim = chi2mass[chi2<10]
 
     fig = plt.figure()
     bins_m = np.linspace(0, 500, 100)
@@ -261,16 +298,21 @@ if __name__ == '__main__':
              label='$\chi^2 < 10$ no bfixed', density=True)
     plt.hist(bfixed['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
              label='$\chi^2 < 10$ bfixed', density=True)
-    plt.hist(tj_top1_allp, bins=bins_m, histtype='step', label='Top 1 (NN pred) all partons in sample',
+    plt.hist(tj_top1, bins=bins_m, histtype='step', label='Top 1 (NN pred) all partons in sample',
              density=True)
-    plt.hist(tj_top1, bins=bins_m, histtype='step', label='Top 1 (NN pred) no extra parton cut',
+    plt.hist(tj_top1_notallp, bins=bins_m, histtype='step', label='Top 1 (NN pred) no parton cut',
              density=True)
-    plt.hist(chi2mass_skim, bins=bins_m, histtype='step', label='Top 1 (my chi2 < 10) no extra parton cut',
+    if args.do_chi2:
+        plt.hist(chi2mass_skim, bins=bins_m, histtype='step', label='Top 1 (my chi2 no bfixed < 10) no parton cut',
              density=True)
     plt.xlabel('$t_1$ mass [GeV]')
+    plt.ylim(0,0.03) 
     plt.legend()
     plt.grid()
-    plt.savefig(args.output_dir / 'mass_dist.png')
+    if args.do_chi2:
+        plt.savefig(args.output_dir / 'mass_dist_withmychi2.png')
+    else:
+        plt.savefig(args.output_dir / 'mass_dist.png')
 
     #truth = uproot.lazyarrays(
     #    input_files,
