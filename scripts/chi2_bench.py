@@ -147,10 +147,7 @@ def tj_distr(npz_file, dochi2=False, sample=None):
     nevents = len(jets)
     print("Npz file after cut has ",nevents)
 
-<<<<<<< HEAD
     njets = jets.shape[1]
-=======
->>>>>>> master
     if dochi2:
         chi2, mass = eval_chi2(jets)
     else:
@@ -172,37 +169,11 @@ def tj_distr(npz_file, dochi2=False, sample=None):
     # minv_top1_truth = minv(jets_top1_truth.sum(1))
     # minv_top2_truth = minv(jets_top2_truth.sum(1))
 
-<<<<<<< HEAD
     minv_top1_pred = my_varcount_alg(data,jets,sample, cut)
     #minv_top1_pred = tj_fixedcount_alg(data,jets,sample, cut)
 
     return minv_top1_pred, chi2, mass
 
-    # for i in range(10):
-    #     print('\n\n',i)
-    #     print(jets[i])
-    #     print(ISR_truth[i])
-    #     print(ISR_pred[i])
-    #     print(ttbar_truth[i])
-    #     print(ttbar_pred[i])
-
-    #histargs = {"bins":50, "range":(0.,250.), "density":False, "histtype":'step'}
-
-    #fig = plt.figure()
-    #plt.hist(minv_top1_truth, label='Top 1 (truth)', **histargs, alpha=0.5, fill=True)
-    #plt.hist(minv_top2_truth, label='Top 2 (truth)', **histargs, alpha=0.5, fill=True)
-    #plt.hist(minv_top1_pred, label='Top 1 (pred)', **histargs)
-    #plt.hist(minv_top2_pred, label='Top 2 (pred)', **histargs)
-    #plt.legend(loc="upper left")
-    #plt.savefig('{}/top_mass_{}.png'.format(datadir,sample))
-    #plt.close()
-
-    #perfectISR = np.equal(ISR_pred,ISR_truth).sum(1)==njets
-    #print("Perfect ISR fraction ({}) = {} / {} = {:.3f}".format(sample,perfectISR.sum(),nevents,float(perfectISR.sum())/nevents))
-    #perfectmatch = perfectISR & (np.equal(ttbar_pred,ttbar_truth).sum(1)==6)
-    #print("Perfect match fraction ({}) = {} / {} = {:.3f}".format(sample,perfectmatch.sum(),nevents,float(perfectmatch.sum())/nevents))
-    #print("\n")
-
 def my_varcount_alg(data,jets,sample,cut):
 
     # Plot network-labeled jet mass distribution
@@ -210,50 +181,33 @@ def my_varcount_alg(data,jets,sample,cut):
     had1_pred_score = had1_pred_score[cut]
     had2_pred_score = data["pred_lep1top_{}".format(sample)]
     had2_pred_score = had2_pred_score[cut]
-    sum_score = had1_pred_score+had2_pred_score
-    had1_pred_score /= sum_score
-    had2_pred_score /= sum_score
+    #sum_score = had1_pred_score+had2_pred_score
+    #had1_pred_score /= sum_score
+    #had2_pred_score /= sum_score
 
-=======
-    #minv_top1_pred = my_varcount_alg(data,jets,sample, cut)
-    minv_top1_pred = tj_fixedcount_alg(data,jets,sample, cut)
-
-    return minv_top1_pred, chi2, mass
-
-def my_varcount_alg(data,jets,sample,cut):
-
-    # Plot network-labeled jet mass distribution
-    had1_pred_score = data["pred_ttbar_{}".format(sample)]
-    had1_pred_score = had1_pred_score[cut]
-    had2_pred_score = data["pred_lep1top_{}".format(sample)]
-    had2_pred_score = had2_pred_score[cut]
-    sum_score = had1_pred_score+had2_pred_score
-    had1_pred_score /= sum_score
-    had2_pred_score /= sum_score
-
->>>>>>> master
     # Convert scores to flags
     nevents = len(had1_pred_score)
     had1_choice = np.zeros(had1_pred_score.shape)
     _had1_pred_score = np.array(had1_pred_score) # temp var to modify
-    for i in range(2): #choose two jets for one top
-        # choose the highest scoring jet
-        had1_choice[np.arange(nevents), _had1_pred_score.argmax(1)] = 1
-        # set the score to 0 to ignore it in the next iteration
-        _had1_pred_score[np.arange(nevents), _had1_pred_score.argmax(1)] = 0
-
     had2_choice = np.zeros(had2_pred_score.shape)
     _had2_pred_score = np.array(had2_pred_score) # temp var to modify
     for i in range(2): #choose two jets for one top
         # choose the highest scoring jet
+        had1_choice[np.arange(nevents), _had1_pred_score.argmax(1)] = 1
+        # set the score to 0 to ignore it in the next iteration
+        _had2_pred_score[np.arange(nevents), _had1_pred_score.argmax(1)] = 0
+        _had1_pred_score[np.arange(nevents), _had1_pred_score.argmax(1)] = 0
+
+        # choose the highest scoring jet
         had2_choice[np.arange(nevents), _had2_pred_score.argmax(1)] = 1
         # set the score to 0 to ignore it in the next iteration
+        _had1_pred_score[np.arange(nevents), _had2_pred_score.argmax(1)] = 0
         _had2_pred_score[np.arange(nevents), _had2_pred_score.argmax(1)] = 0
 
     threshold = 0.5
-    had1_above_threshold = _had1_pred_score.max(1) > 0.5
+    had1_above_threshold = _had1_pred_score.max(1) > threshold
     had1_choice[np.arange(nevents), _had1_pred_score.argmax(1)] = had1_above_threshold
-    had2_above_threshold = _had2_pred_score.max(1) > 0.5
+    had2_above_threshold = _had2_pred_score.max(1) > threshold
     had2_choice[np.arange(nevents), _had2_pred_score.argmax(1)] = had2_above_threshold
 
     jets_had1 = np.copy(jets)
@@ -303,33 +257,9 @@ def tj_fixedcount_alg(data,jets,sample,cut):
     minv_top1_pred = minv(jets_top1_pred.sum(1))
     minv_top2_pred = minv(jets_top2_pred.sum(1))
     return minv_top1_pred
-<<<<<<< HEAD
 
 if __name__ == '__main__':
 
-    # jets_etaphi = [[ 97242.921 , 0.6877870 , -1.628724 , 121789.06],
-    #         [ 91254.734 , -0.077293 , 2.6106293 , 91859.867],
-    #         [ 86505.171 , -1.494373 , 0.4952870 , 202573.29],
-    #         [ 71843.148 , 0.2761235 , -2.958802 , 75055.796],
-    #         [     71331 , -0.861143 , 1.8417986 ,     99926],
-    #         [ 60377.855 , -1.335611 , -0.644344 , 122985.21],
-    #        ]
-    # jets_etaphi = np.ndarray((6,4),buffer=np.array(jets_etaphi))
-    # jets = np.copy(jets_etaphi)
-    # jets[:,0] = jets_etaphi[:,0]*np.cos(jets_etaphi[:,2])
-    # jets[:,1] = jets_etaphi[:,0]*np.sin(jets_etaphi[:,2])
-    # jets[:,2] = jets_etaphi[:,0]*np.sinh(jets_etaphi[:,1])
-    # jets = jets*1e-3
-    # tripletsNoBtag =  generateTripletsNoBtag(jets)
-    # results = evalPerm(tripletsNoBtag)
-    # print(results)
-    # sys.exit(1)
-
-=======
-
-if __name__ == '__main__':
-
->>>>>>> master
     import argparse
     parser = argparse.ArgumentParser(description='Chi2 benchmark.')
     parser.add_argument('--xsttbar-dir', required=True, type=Path,
@@ -386,15 +316,9 @@ if __name__ == '__main__':
     plt.hist(bfixed_skim['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
              label='$\chi^2 < 10$ bfixed', density=True)
     plt.hist(tj_top1, bins=bins_m, histtype='step', label='Top 1 (NN pred) all partons in sample',
-<<<<<<< HEAD
              density=True)
     plt.hist(tj_top1_notallp, bins=bins_m, histtype='step', label='Top 1 (NN pred) no parton cut',
              density=True)
-=======
-             density=True)
-    plt.hist(tj_top1_notallp, bins=bins_m, histtype='step', label='Top 1 (NN pred) no parton cut',
-             density=True)
->>>>>>> master
     if args.do_chi2:
         plt.hist(chi2mass_skim, bins=bins_m, histtype='step', label='Top 1 (my chi2 no bfixed < 10) no parton cut',
              density=True)

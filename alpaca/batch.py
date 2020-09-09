@@ -46,9 +46,15 @@ class BatchManager:
         # jets match the leading jet or not
         topmatch = labels  > 3
         dummy1 = labels <=3
-        dummymatch = dummy1 & jetfromttbar
+        antitopmatch = dummy1 & jetfromttbar
+        leadtopmatch = topmatch.argmax(1)
+        leadantitopmatch = antitopmatch.argmax(1)
+
+        leadtopchoice = np.array([top if leadtop<leadantitop else antitop for top,antitop,leadtop,leadantitop in zip(topmatch,antitopmatch,leadtopmatch,leadantitopmatch)])
+        leadantitopchoice = np.array([top if leadtop>leadantitop else antitop for top,antitop,leadtop,leadantitop in zip(topmatch,antitopmatch,leadtopmatch,leadantitopmatch)])
+
         isbjet = np.array([np.equal(r, 1) | np.equal(r, 4) for r in labels])
-        jetlabels = np.concatenate([jetfromttbar, topmatch, dummymatch, isbjet], 1)
+        jetlabels = np.concatenate([jetfromttbar, leadtopchoice, leadantitopchoice, isbjet], 1)
         # Substitute this line for the preceding if only doing the 6 top jets
         # Not currently configurable by command line because it's a bit more
         # complicated overall + less often changed
