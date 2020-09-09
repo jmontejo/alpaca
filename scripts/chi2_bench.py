@@ -147,7 +147,10 @@ def tj_distr(npz_file, dochi2=False, sample=None):
     nevents = len(jets)
     print("Npz file after cut has ",nevents)
 
+<<<<<<< HEAD
     njets = jets.shape[1]
+=======
+>>>>>>> master
     if dochi2:
         chi2, mass = eval_chi2(jets)
     else:
@@ -169,6 +172,7 @@ def tj_distr(npz_file, dochi2=False, sample=None):
     # minv_top1_truth = minv(jets_top1_truth.sum(1))
     # minv_top2_truth = minv(jets_top2_truth.sum(1))
 
+<<<<<<< HEAD
     minv_top1_pred = my_varcount_alg(data,jets,sample, cut)
     #minv_top1_pred = tj_fixedcount_alg(data,jets,sample, cut)
 
@@ -210,6 +214,24 @@ def my_varcount_alg(data,jets,sample,cut):
     had1_pred_score /= sum_score
     had2_pred_score /= sum_score
 
+=======
+    #minv_top1_pred = my_varcount_alg(data,jets,sample, cut)
+    minv_top1_pred = tj_fixedcount_alg(data,jets,sample, cut)
+
+    return minv_top1_pred, chi2, mass
+
+def my_varcount_alg(data,jets,sample,cut):
+
+    # Plot network-labeled jet mass distribution
+    had1_pred_score = data["pred_ttbar_{}".format(sample)]
+    had1_pred_score = had1_pred_score[cut]
+    had2_pred_score = data["pred_lep1top_{}".format(sample)]
+    had2_pred_score = had2_pred_score[cut]
+    sum_score = had1_pred_score+had2_pred_score
+    had1_pred_score /= sum_score
+    had2_pred_score /= sum_score
+
+>>>>>>> master
     # Convert scores to flags
     nevents = len(had1_pred_score)
     had1_choice = np.zeros(had1_pred_score.shape)
@@ -249,6 +271,7 @@ def my_varcount_alg(data,jets,sample,cut):
 
 def tj_fixedcount_alg(data,jets,sample,cut):
 
+    njets = jets.shape[1]
     # Plot network-labeled jet mass distribution
     ISR_pred_score = data["pred_ISR_{}".format(sample)]
     ISR_pred_score = ISR_pred_score[cut]
@@ -280,6 +303,7 @@ def tj_fixedcount_alg(data,jets,sample,cut):
     minv_top1_pred = minv(jets_top1_pred.sum(1))
     minv_top2_pred = minv(jets_top2_pred.sum(1))
     return minv_top1_pred
+<<<<<<< HEAD
 
 if __name__ == '__main__':
 
@@ -301,6 +325,11 @@ if __name__ == '__main__':
     # print(results)
     # sys.exit(1)
 
+=======
+
+if __name__ == '__main__':
+
+>>>>>>> master
     import argparse
     parser = argparse.ArgumentParser(description='Chi2 benchmark.')
     parser.add_argument('--xsttbar-dir', required=True, type=Path,
@@ -357,9 +386,15 @@ if __name__ == '__main__':
     plt.hist(bfixed_skim['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
              label='$\chi^2 < 10$ bfixed', density=True)
     plt.hist(tj_top1, bins=bins_m, histtype='step', label='Top 1 (NN pred) all partons in sample',
+<<<<<<< HEAD
              density=True)
     plt.hist(tj_top1_notallp, bins=bins_m, histtype='step', label='Top 1 (NN pred) no parton cut',
              density=True)
+=======
+             density=True)
+    plt.hist(tj_top1_notallp, bins=bins_m, histtype='step', label='Top 1 (NN pred) no parton cut',
+             density=True)
+>>>>>>> master
     if args.do_chi2:
         plt.hist(chi2mass_skim, bins=bins_m, histtype='step', label='Top 1 (my chi2 no bfixed < 10) no parton cut',
              density=True)
