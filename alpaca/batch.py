@@ -83,7 +83,7 @@ class BatchManager:
         Args:
             file_path: path to the input file
 
-            shuffule_jets: if set to `True` for each event the jets are
+            shuffle_jets: if set to `True` for each event the jets are
                 shuffled, so that if they were pT ordered they will not be
                 anymore
 
