@@ -29,7 +29,7 @@ function setup_conda () {
   # https://pip.pypa.io/en/stable/user_guide/
   export PYTHONUSERBASE=${ALPACA_DIR}
 
-  export PATH=${ALPACA_DIR}/bin:${PATH}
+  export PATH=${ALPACA_DIR}/bin:${ALPACA_DIR}/scripts:${PATH}
 
   echo "[INFO] Finished env setup"
 }
