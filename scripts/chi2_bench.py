@@ -128,8 +128,8 @@ def eval_chi2(jets):
     results = np.vstack(np.array(list(map(evalPerm,tripletsNoBtag))))
     return results[:,0], results[:,1]
 
-def tj_distr(npz_file, dochi2=False, sample=None):
-    data = np.load(npz_file)
+def tj_distr(args, sample=None):
+    data = np.load(args.npz)
 
     if not sample:
         sample = "6-jet"
@@ -148,7 +148,7 @@ def tj_distr(npz_file, dochi2=False, sample=None):
     print("Npz file after cut has ",nevents)
 
     njets = jets.shape[1]
-    if dochi2:
+    if args.do_chi2:
         chi2, mass = eval_chi2(jets)
     else:
         chi2 = np.zeros(nevents)
@@ -169,21 +169,30 @@ def tj_distr(npz_file, dochi2=False, sample=None):
     # minv_top1_truth = minv(jets_top1_truth.sum(1))
     # minv_top2_truth = minv(jets_top2_truth.sum(1))
 
-    minv_top1_pred = my_varcount_alg(data,jets,sample, cut)
+    minv_top1_pred = my_varcount_alg(data,jets,sample, cut, args)
     #minv_top1_pred = tj_fixedcount_alg(data,jets,sample, cut)
 
     return minv_top1_pred, chi2, mass
 
-def my_varcount_alg(data,jets,sample,cut):
+def my_varcount_alg(data,jets,sample,cut, args):
 
     # Plot network-labeled jet mass distribution
+    ISR_pred_score = data["pred_ISR_{}".format(sample)]
+    ISR_pred_score = ISR_pred_score[cut]
     had1_pred_score = data["pred_ttbar_{}".format(sample)]
     had1_pred_score = had1_pred_score[cut]
     had2_pred_score = data["pred_lep1top_{}".format(sample)]
     had2_pred_score = had2_pred_score[cut]
-    #sum_score = had1_pred_score+had2_pred_score
-    #had1_pred_score /= sum_score
-    #had2_pred_score /= sum_score
+    if args.normalize_scores:
+        sum_score = had1_pred_score+had2_pred_score
+    elif args.normalize_scores_ISR:
+        sum_score = had1_pred_score+had2_pred_score+ISR_pred_score
+    else:
+        sum_score = 1
+    had1_pred_score /= sum_score
+    had2_pred_score /= sum_score
+    ISR_pred_score /= sum_score
+
 
     # Convert scores to flags
     nevents = len(had1_pred_score)
@@ -191,7 +200,12 @@ def my_varcount_alg(data,jets,sample,cut):
     _had1_pred_score = np.array(had1_pred_score) # temp var to modify
     had2_choice = np.zeros(had2_pred_score.shape)
     _had2_pred_score = np.array(had2_pred_score) # temp var to modify
-    for i in range(2): #choose two jets for one top
+
+    if args.exclude_highest_ISR:
+        _had2_pred_score[np.arange(nevents), ISR_pred_score.argmax(1)] = 0
+        _had1_pred_score[np.arange(nevents), ISR_pred_score.argmax(1)] = 0
+    usenjet = 2 if args.allow_2jet else 3
+    for i in range(usenjet): #choose two jets for one top
         # choose the highest scoring jet
         had1_choice[np.arange(nevents), _had1_pred_score.argmax(1)] = 1
         # set the score to 0 to ignore it in the next iteration
@@ -204,7 +218,7 @@ def my_varcount_alg(data,jets,sample,cut):
         _had1_pred_score[np.arange(nevents), _had2_pred_score.argmax(1)] = 0
         _had2_pred_score[np.arange(nevents), _had2_pred_score.argmax(1)] = 0
 
-    threshold = 0.5
+    threshold = 0.5 if args.allow_2jet else 1.5
     had1_above_threshold = _had1_pred_score.max(1) > threshold
     had1_choice[np.arange(nevents), _had1_pred_score.argmax(1)] = had1_above_threshold
     had2_above_threshold = _had2_pred_score.max(1) > threshold
@@ -269,6 +283,13 @@ if __name__ == '__main__':
                         help='path to the npz file out of alpaca')
     parser.add_argument('--do-chi2', action="store_true",
                     help='Compute chi2 and compare against it')
+    parser.add_argument('--allow-2jet', action="store_true",
+                    help='Use two or more jets for the tops')
+    parser.add_argument('--normalize-scores', action="store_true",
+                    help='Renormalize to sum of scores')
+    parser.add_argument('--normalize-scores-ISR', action="store_true",
+                    help='Renormalize to sum of scores including ISR')
+    parser.add_argument('--exclude-highest-ISR', action="store_true")
     parser.add_argument('--output-dir', type=Path,
                         help='path to the output directory')
     args = parser.parse_args()
@@ -280,8 +301,8 @@ if __name__ == '__main__':
     bfixed = get_base_events(list((args.xsttbar_dir / dataset_bfixed).glob('*.root')))
 
 
-    tj_top1, unused1, unused2 = tj_distr(args.npz, sample="Test")
-    tj_top1_notallp, chi2, chi2mass = tj_distr(args.npz, args.do_chi2, sample="6-jet")
+    tj_top1, unused1, unused2 = tj_distr(args, sample="Test")
+    tj_top1_notallp, chi2, chi2mass = tj_distr(args, sample="6-jet")
 
     fig = plt.figure()
     bins_chi = np.linspace(0, 40, 400)
@@ -330,10 +351,18 @@ if __name__ == '__main__':
     plt.ylim(0,0.03) 
     plt.legend()
     plt.grid()
+    title = 'mass_dist'
+    if args.allow_2jet:
+        title += '_allow2jet'
+    if args.exclude_highest_ISR:
+        title += '_excludehighestISR'
+    if args.normalize_scores:
+        title += '_normalizescores'
+    if args.normalize_scores_ISR:
+        title += '_normalizescoresISR'
     if args.do_chi2:
-        plt.savefig(args.output_dir / 'mass_dist_withmychi2.png')
-    else:
-        plt.savefig(args.output_dir / 'mass_dist.png')
+        title += '_withmychi2'
+    plt.savefig(args.output_dir / (title+'.png') )
 
     #truth = uproot.lazyarrays(
     #    input_files,

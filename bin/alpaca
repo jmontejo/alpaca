@@ -230,9 +230,30 @@ if __name__ == '__main__':
             flatdict["truth_{}_{}".format(discr, sample)] = truth[discr][sample]
     np.savez(str(output_dir / "data.npz"), **flatdict)
 
-
     #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --do-chi2 --output-dir {out}".format(out=output_dir)
     cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out}".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --allow-2jet".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores-ISR".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores-ISR".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores --allow-2jet".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores-ISR --allow-2jet".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --allow-2jet".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores --allow-2jet".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores-ISR --allow-2jet".format(out=output_dir)
     os.system(cmd)
 
     from alpaca.plot import *

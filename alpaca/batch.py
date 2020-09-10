@@ -32,10 +32,10 @@ class BatchManager:
         jets = labeledjets[:, :, :4]
         labels = np.array(labeledjets[:, :, -1:].squeeze(), dtype=int)
 
-        if all_partons_included==False:
-            self._jets = jets
-            self._jetlabels = np.zeros((len(jets),jets_per_event+11))
-            return
+        #if all_partons_included==False:
+        #    self._jets = jets
+        #    self._jetlabels = np.zeros((len(jets),jets_per_event+11))
+        #    return
 
         # Convert the parton labels to bools that the network can make sense of
         # is the jet from the ttbar system?
