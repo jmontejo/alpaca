@@ -57,7 +57,8 @@ for nom_df, truth_df, truth_eventN_df in zip(nom_iter,truth_iter,truth_eventN_it
     sixmatches = truncated_df["partonlabel"].count(level="entry")==6
     filtercond = partonsexist & sixmatches
 
-    filtered_df = truncated_df[filtercond]
+    #filtered_df = truncated_df[filtercond]
+    filtered_df = truncated_df #unfiltered
 
     # Extract just jets with partons matched below the chosen deltaR cut
     goodmatch = filtered_df[dRbranches].min(axis=1) < match_dRcut
@@ -66,10 +67,10 @@ for nom_df, truth_df, truth_eventN_df in zip(nom_iter,truth_iter,truth_eventN_it
     # Reshape the df to have one event per row,
     # filling each overflow entry with 0's
     # Extract just the cartesian coordinates and the parton index
-    jet_cartesian = ["jet_"+comp for comp in ["px","py","pz","e"]]
+    jet_cartesian = ["jet_"+comp for comp in ["px","py","pz","e", "DL1r"]]
     unstacked_df = filtered_df[jet_cartesian+["partonindex"]].unstack(fill_value=0)
 
     # Write out to an hdf5 file
-    unstacked_df.to_hdf("truthmatched.h5",key="df",mode='w' if ifile==0 else 'a',append=True)
+    unstacked_df.to_hdf("truthmatched_unfiltered_DL1r.h5",key="df",mode='w' if ifile==0 else 'a',append=True)
 
     ifile+=1

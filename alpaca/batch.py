@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 class BatchManager:
 
     def __init__(self, input_path, shuffle_jets=False, shuffle_events=False,
-                 jets_per_event=10, zero_jets=0, all_partons_included=True):
+                 jets_per_event=10, zero_jets=0, all_partons_included=True, qcd_like=False):
         """Refer to the documentation of the private method `_get_jets`."""
         labeledjets = self._get_jets(
             input_path=input_path,
@@ -22,6 +22,7 @@ class BatchManager:
             jets_per_event=jets_per_event,
             zero_jets=zero_jets,
             all_partons_included=all_partons_included,
+            qcd_like=qcd_like,
         )
 
         # The rest of this method is about parsing the partonindex labels to
@@ -69,6 +70,8 @@ class BatchManager:
         # to complete top1 and 2 b-jets.
         def good_labels(r,all_partons_included):
             if not all_partons_included: return True
+            if qcd_like: return True
+
             njets = labeledjets.shape[1]
             return (r[:njets].sum() == 6) and \
                    (r[njets:njets*2].sum() == 3) and \
@@ -83,7 +86,7 @@ class BatchManager:
 
     @staticmethod
     def _get_jets(input_path, shuffle_jets=False, shuffle_events=False,
-                  jets_per_event=10, zero_jets=0, all_partons_included=True):
+                  jets_per_event=10, zero_jets=0, all_partons_included=True, qcd_like=False):
         """Function that reads an input file and returns a numpy array properly
         formatted, ready to be converted to pytorch tensors.
 
@@ -141,7 +144,11 @@ class BatchManager:
         #    remaining jets after the Nth there aren't any (note the minus sign)
         # - the leading jets are all existent
         #leadingNincludealltop = - df[[("partonindex", i) for i in range(jets_per_event, tot_jets_per_event)]].any(axis=1) #not "- zero_jets" this would make the last jet always ISR
-        leadingNincludealltop = (df[[("partonindex", i) for i in range(jets_per_event)]]>0).sum(1) ==6
+        if qcd_like:
+            leadingNincludealltop = (df[[("partonindex", i) for i in range(jets_per_event)]]>0).sum(1) <=2
+        else:
+            leadingNincludealltop = (df[[("partonindex", i) for i in range(jets_per_event)]]>0).sum(1) ==6
+
         leadingNarenonzero = df[[("jet_e", i) for i in range(jets_per_event - zero_jets)]].all(axis=1)
 
         #exactlyleadingNarenonzero = - df[[("jet_e", i) for i in range(jets_per_event, tot_jets_per_event)]].any(axis=1) #not "- zero_jets" this would make the last jet always ISR
@@ -207,7 +214,7 @@ class BatchManager:
         """
         stop_index = start_index + N
         if stop_index > self.get_nr_events():
-            log.warning('The stop index is greater than the size of the array')
+            log.warning('The stop index (%d) is greater than the size of the array (%d)'%(stop_index,self.get_nr_events()))
         X = torch.as_tensor(self._jets[start_index:stop_index, :], dtype=torch.float)
         Y = torch.as_tensor(self._jetlabels[start_index:stop_index, :], dtype=torch.float)
         return X, Y
