@@ -12,6 +12,8 @@ class SimpleNN(torch.nn.Module):
         self.ntotal = nobjects
         self.norm = torch.nn.BatchNorm1d(self.ntotal * 4)
         self.head = FeedForwardHead([self.ntotal * 4] + fflayers + [noutputs])
+        pytorch_total_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        print("Total number of trainable parameters in SimpleNN:",pytorch_total_params)
 
     # Jets go in, labels come out
     def forward(self, vectors):

@@ -61,6 +61,9 @@ class Hydra(torch.nn.Module):
         self.fflayers = fflayers
         self.isr_head = IsrHead(self.njets,self.ncombos,self.fflayers)
         self.decay_head = DecayHead(self.njets, self.ncombos,self.fflayers)
+        pytorch_total_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        print("Total number of trainable parameters in Hydra:",pytorch_total_params)
+
 
     def forward(self,vectors):
         # Get the ISR tag result
