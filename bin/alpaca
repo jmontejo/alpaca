@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import logging
+import os
 
 from pathlib import Path
 import datetime
@@ -221,13 +222,14 @@ if __name__ == '__main__':
         shuffle_jets=args.shuffle_jets,
         shuffle_events=args.shuffle_events,
         jets_per_event=njets,
-        zero_jets=1 # padding one of the seven jet
+        zero_jets=1, # padding one of the seven jet
+        all_partons_included=False,
     )
     log.info('Extracting sample of events with exactly 6 jets')
     # sample from the last events of the 39k 6-jet events
     fill_arrays(
         bm_6j.get_torch_batch(
-            500,
+            5000,
             start_index=0
         ),
         "6-jet",
@@ -244,6 +246,32 @@ if __name__ == '__main__':
             flatdict["truth_{}_{}".format(discr, sample)] = truth[discr][sample]
     np.savez(str(output_dir / "data.npz"), **flatdict)
 
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --do-chi2 --output-dir {out}".format(out=output_dir)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out}".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --allow-2jet".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores-ISR".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores-ISR".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores --allow-2jet".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores-ISR --allow-2jet".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --allow-2jet".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores --allow-2jet".format(out=output_dir)
+    os.system(cmd)
+    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores-ISR --allow-2jet".format(out=output_dir)
+    os.system(cmd)
+
     from alpaca.plot import *
     log.info('Plot combination weights')
     if args.simple_nn:
@@ -253,7 +281,6 @@ if __name__ == '__main__':
         plot_hydra_weights(model, output_dir)
     else:
         plot_cola_weights(model, output_dir)
-
 
     log.info('Plot scores and ROC curves for ISR matching')
     plot_score_roc(

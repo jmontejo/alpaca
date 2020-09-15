@@ -39,7 +39,7 @@ class DecayHead(torch.nn.Module):
         # This one reconstructs the decay process, taking the ISR result as input
         # Both the top decay matching and the b-tagging
         # (these seem like things that should emerge simultaneously)
-        self.head = FeedForwardHead([self.ntotal * 5] + fflayers + [11])
+        self.head = FeedForwardHead([self.ntotal * 5] + fflayers + [njets*3])
 
     def forward(self,selected_vector):
         output = self.cola(selected_vector)
@@ -61,6 +61,9 @@ class Hydra(torch.nn.Module):
         self.fflayers = fflayers
         self.isr_head = IsrHead(self.njets,self.ncombos,self.fflayers)
         self.decay_head = DecayHead(self.njets, self.ncombos,self.fflayers)
+        pytorch_total_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        print("Total number of trainable parameters in Hydra:",pytorch_total_params)
+
 
     def forward(self,vectors):
         # Get the ISR tag result

@@ -122,7 +122,7 @@ def plot_topmatch(pred, truth, output_dir):
 
     fig = plt.figure()
     histargs = {"bins":50, "range":(-1,1.), "density":True, "histtype":'step'}
-    for sample in ["Test","Train","6-jet"]:
+    for sample in ["Test","Train"]: #,"6-jet"]: #6-jet is actuall not all partons, crashes
         diff_ttbar = np.array([p[t==1].min() - p[t==0].max() for t,p in zip(truth["ttbar"][sample],pred["ttbar"][sample])])
         plt.hist(diff_ttbar, label='Diff ({})'.format(sample), **histargs)
     plt.legend(loc="upper center" )
