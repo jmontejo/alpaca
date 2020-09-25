@@ -291,15 +291,16 @@ if __name__ == '__main__':
     parser.add_argument('--normalize-scores-ISR', action="store_true",
                     help='Renormalize to sum of scores including ISR')
     parser.add_argument('--exclude-highest-ISR', action="store_true")
+    parser.add_argument('--small', action="store_true")
     parser.add_argument('--output-dir', type=Path,
                         help='path to the output directory')
     args = parser.parse_args()
 
-    #dataset_nobfixed = 'user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS36_R21_allhad_resolved.root'
+    dataset_nobfixed = 'user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS36_R21_allhad_resolved.root'
     dataset_bfixed = 'user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS34_R21_allhad_resolved.root'
 
-    #no_bfixed = get_base_events(list((args.xsttbar_dir / dataset_nobfixed).glob('*.root')))
-    #bfixed = get_base_events(list((args.xsttbar_dir / dataset_bfixed).glob('*.root')))
+    no_bfixed = get_base_events(list((args.xsttbar_dir / dataset_nobfixed).glob('*.root')))
+    bfixed = get_base_events(list((args.xsttbar_dir / dataset_bfixed).glob('*.root')))
 
 
     tj_top1, unused1, unused2 = tj_distr(args, sample="Test")
@@ -333,12 +334,13 @@ if __name__ == '__main__':
 
     fig = plt.figure()
     bins_m = np.linspace(0, 500, 100)
-    plt.hist(no_bfixed_skim['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
-             label='$\chi^2 < 10$ no bfixed', density=True)
-    plt.hist(bfixed_skim['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
-             label='$\chi^2 < 10$ bfixed', density=True)
-    plt.hist(tj_top1, bins=bins_m, histtype='step', label='Top 1 (NN pred) all partons in sample',
-             density=True)
+    if not args.small:
+        plt.hist(no_bfixed_skim['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
+                 label='$\chi^2 < 10$ no bfixed', density=True)
+        plt.hist(bfixed_skim['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
+                 label='$\chi^2 < 10$ bfixed', density=True)
+        plt.hist(tj_top1, bins=bins_m, histtype='step', label='Top 1 (NN pred) all partons in sample',
+                 density=True)
     plt.hist(tj_top1_notallp, bins=bins_m, histtype='step', label='Top 1 (NN pred) no parton cut',
              density=True)
     if args.do_chi2:
@@ -347,9 +349,9 @@ if __name__ == '__main__':
         plt.hist(tj_top1_notallp_skim, bins=bins_m, histtype='step', label='Top 1 (NN pred, my chi2 < 10) no parton cut',
              density=True)
     plt.hist(no_bfixed['reco_t1_m'] / 1000, bins=bins_m, histtype='step',
-             label='$\chi^2$ no cut, no bfixed', density=True)
+             label='$\chi^2$ no cut', density=True)
     plt.xlabel('$t_1$ mass [GeV]')
-    plt.ylim(0,0.03) 
+    plt.ylim(0,0.012 if args.small else 0.03) 
     plt.legend()
     plt.grid()
     title = 'mass_dist'
@@ -363,6 +365,8 @@ if __name__ == '__main__':
         title += '_normalizescoresISR'
     if args.do_chi2:
         title += '_withmychi2'
+    if args.small:
+        title += '_small'
     plt.savefig(args.output_dir / (title+'.png') )
 
     #truth = uproot.lazyarrays(

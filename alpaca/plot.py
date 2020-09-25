@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import roc_curve, auc
 
-__all__ = ['plot_cola_weights', 'plot_hydra_weights', 'plot_roc_curve',
+__all__ = ['plot_cola_weights', 'plot_hydra_weights', 'plot_roc_curve', 'get_roc_auc',
            'plot_score_roc', 'plot_true_ISR', 'plot_index_ISR',
            'plot_topmatch']
 
@@ -24,6 +24,9 @@ def plot_hydra_weights(model, output_dir):
         plt.savefig(str(output_dir / 'w_combo_decay.png'))
         plt.close()
 
+def get_roc_auc(pred,truth):
+    fpr, tpr, thr = roc_curve(truth, pred)
+    return auc(fpr, tpr)
 
 def plot_roc_curve(pred,truth,filename):
     fpr, tpr, thr = roc_curve(truth, pred)
@@ -68,7 +71,7 @@ def plot_true_ISR(pred, truth, output_dir):
     fig = plt.figure()
     histargs = {"bins":50, "range":(0.,1.), "density":True, "histtype":'step'}
     for sample in ["Test","Train","6-jet"]:
-        max_ISRjet = np.array([p[t==0].max() for t,p in zip(truth["ISR"][sample],pred["ISR"][sample])])
+        max_ISRjet = np.array([p[t==0].max(initial=0) for t,p in zip(truth["ISR"][sample],pred["ISR"][sample])])
         plt.hist(max_ISRjet, label=sample, **histargs)
     plt.legend()
     plt.xlabel('Highest non-ISR output for ISR jets in the event')
@@ -77,7 +80,7 @@ def plot_true_ISR(pred, truth, output_dir):
 
     fig = plt.figure()
     for sample in ["Test","Train","6-jet"]:
-        min_topjet = np.array([p[t==1].min() for t,p in zip(truth["ISR"][sample],pred["ISR"][sample])])
+        min_topjet = np.array([p[t==1].min(initial=1) for t,p in zip(truth["ISR"][sample],pred["ISR"][sample])])
         plt.hist(min_topjet, label=sample, **histargs)
     plt.legend()
     plt.xlabel('Lowest non-ISR output for non-ISR jets in the event')
@@ -87,7 +90,7 @@ def plot_true_ISR(pred, truth, output_dir):
     fig = plt.figure()
     histargs["range"]=(-1,1)
     for sample in ["Test","Train","6-jet"]:
-        diff_ISR = np.array([p[t==1].min() - p[t==0].max() for t,p in zip(truth["ISR"][sample],pred["ISR"][sample])])
+        diff_ISR = np.array([p[t==1].min(initial=1) - p[t==0].max(initial=0) for t,p in zip(truth["ISR"][sample],pred["ISR"][sample])])
         plt.hist(diff_ISR, label=sample, **histargs)
     plt.legend()
     plt.xlabel('Difference between lowest output for non-ISR jets and highest output for ISR jets in the event')
@@ -123,7 +126,7 @@ def plot_topmatch(pred, truth, output_dir):
     fig = plt.figure()
     histargs = {"bins":50, "range":(-1,1.), "density":True, "histtype":'step'}
     for sample in ["Test","Train"]: #,"6-jet"]: #6-jet is actuall not all partons, crashes
-        diff_ttbar = np.array([p[t==1].min() - p[t==0].max() for t,p in zip(truth["ttbar"][sample],pred["ttbar"][sample])])
+        diff_ttbar = np.array([p[t==1].min(initial=1) - p[t==0].max(initial=0) for t,p in zip(truth["ttbar"][sample],pred["ttbar"][sample])])
         plt.hist(diff_ttbar, label='Diff ({})'.format(sample), **histargs)
     plt.legend(loc="upper center" )
     plt.savefig(str(output_dir / 'diff_topmatch.png'))

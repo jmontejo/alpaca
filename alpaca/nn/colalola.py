@@ -27,9 +27,10 @@ class CoLa(torch.nn.Module):
 
 class LoLa(torch.nn.Module):
 
-    def __init__(self, outputobj):
+    def __init__(self, outputobj, usebjet=False):
         super(LoLa, self).__init__()
         self.outputobj = outputobj
+        self.usebjet = usebjet
         self.w_dist = torch.nn.Parameter(torch.randn(self.outputobj,
                                                      self.outputobj))
         self.w_ener = torch.nn.Parameter(torch.randn(self.outputobj,
@@ -46,7 +47,9 @@ class LoLa(torch.nn.Module):
     def forward(self, combvec):
         weighted_e = torch.einsum('ij,bj->bi', self.w_ener,combvec[:, :, 0]) #linear combination of energies?
         weighted_p = torch.einsum('ij,bj->bi', self.w_pid,combvec[:, :, 3]) #linear combination of pz?
-        #weighted_dl1r = torch.einsum('ij,bj->bi', self.w_dl1r,combvec[:, :, 4]) #linear combination of dl1r
+
+        if self.usebjet:
+            weighted_dl1r = torch.einsum('ij,bj->bi', self.w_dl1r,combvec[:, :, 4]) #linear combination of dl1r
 
 
         a = combvec[..., :4].unsqueeze(2).repeat(1, 1, self.outputobj, 1)
@@ -58,26 +61,38 @@ class LoLa(torch.nn.Module):
         masses = torch.einsum('bni,ij,bnj->bn', combvec[..., :4], self.metric,
                               combvec[..., :4])
         ptsq = combvec[:, :, 1]**2 + combvec[:, :, 2]**2
-        outputs = torch.stack([
-            masses,
-            ptsq,
-            weighted_e,
-            weighted_d,
-            weighted_p,
-            #weighted_dl1r,
-        ], dim=-1)
+        if self.usebjet:
+            outputs = torch.stack([
+                masses,
+                ptsq,
+                weighted_e,
+                weighted_d,
+                weighted_p,
+                weighted_dl1r,
+            ], dim=-1)
+        else:
+            outputs = torch.stack([
+                masses,
+                ptsq,
+                weighted_e,
+                weighted_d,
+                weighted_p,
+                #weighted_dl1r,
+            ], dim=-1)
         return outputs
 
 
 class CoLaLoLa(torch.nn.Module):
 
-    def __init__(self, nobjects, ncombos, noutputs, fflayers=[200]):
+    def __init__(self, nobjects, ncombos, noutputs, fflayers=[200], usebjet=False):
         super(CoLaLoLa, self).__init__()
         self.ntotal = nobjects + ncombos
+        self.usebjet = usebjet
         self.cola = CoLa(nobjects, ncombos)
-        self.lola = LoLa(self.ntotal)
-        self.norm = torch.nn.BatchNorm1d(self.ntotal * 5)
-        self.head = FeedForwardHead([self.ntotal * 5] + fflayers + [noutputs])
+        self.lola = LoLa(self.ntotal, usebjet=usebjet)
+        factor = 6 if usebjet else 5
+        self.norm = torch.nn.BatchNorm1d(self.ntotal * factor )
+        self.head = FeedForwardHead([self.ntotal * factor] + fflayers + [noutputs])
 
     def forward(self, vectors):
         output = self.cola(vectors)

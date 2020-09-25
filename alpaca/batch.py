@@ -233,7 +233,7 @@ class BatchManager:
 class BatchManager2HDM (BatchManager): #need to include lepton 4-vectors, MET
 
     def __init__(self, input_path, shuffle_jets=False, shuffle_events=False,
-                 jets_per_event=10, zero_jets=0):
+                 jets_per_event=10, zero_jets=0, all_partons_included=True):
 
         if "truthmatched.h5" in str(input_path):
             return super().__init__(input_path, shuffle_jets, shuffle_events, jets_per_event, zero_jets)
@@ -253,18 +253,18 @@ class BatchManager2HDM (BatchManager): #need to include lepton 4-vectors, MET
         # which removes some events.
         jetsize = 5
         jets = labeledjets[:, :, :jetsize] #drop parton index, keep 4-vector + bjet
-        print("BatchManager2HDM",jets_per_event,zero_jets,jets[:5,:,0])
 
+        #Fill the btag info for lep+MET outside the DL1r range
         labels = np.array(labeledjets[:, :, -1:].squeeze(), dtype=int) #only parton index
         lep0 = rest[:,:4]
-        lep0 = np.concatenate([lep0,np.zeros([len(lep0),1])],axis=1)
+        lep0 = np.concatenate([lep0,np.full([len(lep0),1], -7)],axis=1)
         lep1 = rest[:,4:8]
-        lep1 = np.concatenate([lep1,np.zeros([len(lep1),1])],axis=1)
+        lep1 = np.concatenate([lep1,np.full([len(lep1),1], -7)],axis=1)
         met  = rest[:,8:]
-        met  = np.concatenate([met,np.zeros([len(met),1])],axis=1)
+        met  = np.concatenate([met, np.full([len(met) ,1], -7)],axis=1)
 
         def myjetlabels(labels):
-            myisr = [j==0 for j in labels]
+            myisr = [j!=0 for j in labels]
             myfromlep0 = [j==1 for j in labels]
             myfromlep1 = [j==2 for j in labels]
             myfromhad0 = [j==3 for j in labels]
@@ -272,9 +272,25 @@ class BatchManager2HDM (BatchManager): #need to include lepton 4-vectors, MET
 
         lep_met = np.stack([lep0,lep1,met],axis=1)
         lep_met_jets = np.concatenate([lep_met,jets],axis=1)
+        labels = myjetlabels(labels)
 
-        self._jets = lep_met_jets
-        self._jetlabels = myjetlabels(labels) #len njets*4
+        def good_labels(r,all_partons_included):
+            if not all_partons_included: return True
+
+            njets = labeledjets.shape[1]
+            return (r[:njets].sum() == 5) and \
+                   (r[njets:njets*2].sum() == 1) and \
+                   (r[njets*2:njets*3].sum() == 1) and \
+                   (r[njets*3:].sum() == 3)
+            #return (r[:njets].sum() >= 3) and \
+            #       (r[njets:njets*3].sum() >= 1) and \
+            #       (r[njets*3:].sum() >= 2)
+                    
+        lep_met_jets_clean = np.array([r for r,t in zip(lep_met_jets,labels) if good_labels(t,all_partons_included)])
+        labels_clean = np.array([r for r in labels if good_labels(r,all_partons_included)])
+
+        self._jets = lep_met_jets_clean
+        self._jetlabels = labels_clean #len njets*4
 
 
     @staticmethod
@@ -304,7 +320,7 @@ class BatchManager2HDM (BatchManager): #need to include lepton 4-vectors, MET
         df = df[leadingNarenonzero]
 
         if shuffle_events:
-            df.reindex(np.random.permutation(df.index))
+            df = df.reindex(np.random.permutation(df.index))
 
         # The input rows have all jet px, all jet py, ... all jet partonindex
         # So segment and swap axes to group by jet
@@ -317,9 +333,6 @@ class BatchManager2HDM (BatchManager): #need to include lepton 4-vectors, MET
         jet_df = df[jet_vars]
         rest_df = df[rest_vars].droplevel(1,axis=1)
         rest_df = rest_df.loc[:,~rest_df.columns.duplicated()]
-
-        print(jet_df.head())
-        print(rest_df.head())
 
         jet_stack = np.swapaxes(jet_df.values.reshape(len(df), len(jet_vars), maxjets), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]

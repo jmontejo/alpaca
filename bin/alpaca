@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 
 import alpaca.log
 from alpaca.batch import BatchManager2HDM
+from math import floor, sqrt
+from alpaca.plot import *
 
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
@@ -25,6 +27,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ML top-like tagger.')
     parser.add_argument('--input-file', '-i', required=True, type=Path,
                         help='path to the file with the input events')
+    parser.add_argument('--input-test-file', type=Path,
+                        help='path to a different file with test events')
     parser.add_argument('--output-dir', type=Path, default=Path('data'),
                         help='path to the output directory')
     parser.add_argument('--tag', default='alpaca',
@@ -36,6 +40,8 @@ if __name__ == '__main__':
     parser.add_argument('--simple-nn', action='store_true',
                         help=('substitute a simple feed-forward NN for '
                               'colalola'))
+    parser.add_argument('--per-jet', action='store_true',
+                        help=('Run networks in per-jet mode'))
     parser.add_argument('--hydra', action='store_true',
                         help='a colalola network with multiple output heads')
     parser.add_argument('--alt-loss', action='store_true',
@@ -43,10 +49,20 @@ if __name__ == '__main__':
     parser.add_argument("--fflayers", nargs="+", type=int, default=[200])
     parser.add_argument("--ncombos", type=int, default=30)
     parser.add_argument("--one-loss", help="use one single loss value",choices=["ISR","lep0top","lep1top","had0top"])
-    parser.add_argument("--weights", default="1,1,1,1",help="weight for each component, format \"a,b,c,d\"")
-
+    default_weights = "1,1,1,1"
+    parser.add_argument("--weights", default=default_weights,help="weight for each component, format \"a,b,c,d\"")
+    parser.add_argument('--adapt-weights', action='store_true',
+                        help='Update the weights to the current loss value')
+    parser.add_argument('--use-bjet', action='store_true',
+                        help='Feed bjet information into CoLaLoLa')
+    parser.add_argument('--not-all-partons', action='store_true',
+                        help='Use also incomplete events')
+    parser.add_argument('--force', action='store_true',
+                        help='Retrain even if NN exists')
 
     args = parser.parse_args()
+    if not args.input_test_file:
+        args.input_test_file = args.input_file
     weights = [float(w) for w in args.weights.split(",")]
     weights = [w/sum(weights) for w in weights] 
 
@@ -55,6 +71,8 @@ if __name__ == '__main__':
     # Autogenerate meaningful names for outputf dir
     output_dir = args.output_dir
     new_dir_name = args.tag
+    if args.shuffle_events:
+        new_dir_name += "_shuffleevents"
     if args.shuffle_jets:
         new_dir_name += "_shuffled"
     else:
@@ -63,10 +81,20 @@ if __name__ == '__main__':
         new_dir_name += "_simplenn"
     elif args.hydra:
         new_dir_name += "_hydra"
+    if args.use_bjet:
+        new_dir_name += "_usebjet"
+    if args.per_jet:
+        new_dir_name += "_perjet"
+    if args.not_all_partons:
+        new_dir_name += "_notallpartons"
     if args.alt_loss:
         new_dir_name += "_altloss"
     if args.one_loss:
         new_dir_name += "_oneloss"+args.one_loss
+    if args.weights != default_weights:
+        new_dir_name += "_"+args.weights.replace(",",".")
+    if args.adapt_weights:
+        new_dir_name += "_adaptweights"
     new_dir_name += "_{}combos".format(args.ncombos)
     layerstr = '_'.join([str(i) for i in args.fflayers])
     new_dir_name += "_" + layerstr
@@ -78,6 +106,7 @@ if __name__ == '__main__':
     log.debug('Alpaca has been started and can finally log')
     log.debug(args)
     log.debug('Input file: %s', args.input_file)
+    param_file = output_dir / 'NN.pt'
 
     log.info('Writing to dir: %s', new_dir_name)
 
@@ -87,86 +116,96 @@ if __name__ == '__main__':
         shuffle_jets=args.shuffle_jets,
         shuffle_events=args.shuffle_events,
         jets_per_event=njets,
-        zero_jets=2 # padding one of the seven jet
+        zero_jets=2, # padding one of the seven jet
+        all_partons_included=not args.not_all_partons,
     )
     log.info('Nr. of events: %s', bm.get_nr_events())
 
     noutputs = njets*4
-    if args.simple_nn:
-        from alpaca.nn.simple import SimpleNN
-        log.info('SimpleNN: nr. jets %s', njets)
-        log.info('  FeedForwardHead intermediate layers: [%s]',
-                 layerstr.replace('_', ','))
-        model = SimpleNN(njets+3, noutputs, fflayers=args.fflayers)
-    elif args.hydra:
-        from alpaca.nn.hydra import Hydra
-        log.info('CoLaLoLa with multiple heads: nr. jets %s - nr. combos %s',
-                 njets, args.ncombos)
-        log.info('  FeedForwardHead intermediate layers: [%s]',
-                 layerstr.replace('_', ','))
-        model = Hydra(njets+3, args.ncombos, fflayers=args.fflayers)
+    test_sample = 5000
+    nr_train = floor(sqrt(bm.get_nr_events()-test_sample))
+    batch_size = nr_train
+    no_train = os.path.exists(param_file) and not args.force
+
+    if no_train:
+        model = torch.load(param_file)
     else:
-        # Plain CoLaLoLa as default
-        from alpaca.nn.colalola import CoLaLoLa
-        log.info('CoLaLoLa: nr. jets %s - nr. combos %s', njets,
-                 args.ncombos)
-        log.info('  FeedForwardHead intermediate layers: [%s]',
-                 layerstr.replace('_', ','))
-        model = CoLaLoLa(njets+3, args.ncombos, noutputs,
-                         fflayers=args.fflayers)
+        if args.simple_nn:
+            if args.per_jet:
+                from alpaca.nn.simpleperjet import SimpleNNperjet as SimpleNN
+            else:
+                from alpaca.nn.simple import SimpleNN
+            log.info('SimpleNN: nr. jets %s', njets)
+            log.info('  FeedForwardHead intermediate layers: [%s]',
+                     layerstr.replace('_', ','))
+            model = SimpleNN(njets+3, noutputs, fflayers=args.fflayers, usebjet=args.use_bjet)
+        elif args.hydra:
+            from alpaca.nn.hydra import Hydra
+            log.info('CoLaLoLa with multiple heads: nr. jets %s - nr. combos %s',
+                     njets, args.ncombos)
+            log.info('  FeedForwardHead intermediate layers: [%s]',
+                     layerstr.replace('_', ','))
+            model = Hydra(njets+3, args.ncombos, fflayers=args.fflayers)
+        else:
+            # Plain CoLaLoLa as default
+            if args.per_jet:
+                from alpaca.nn.colalolaperjet import CoLaLoLaPerJet as CoLaLoLa
+            else:
+                from alpaca.nn.colalola import CoLaLoLa
+            log.info('CoLaLoLa: nr. jets %s - nr. combos %s', njets,
+                     args.ncombos)
+            log.info('  FeedForwardHead intermediate layers: [%s]',
+                     layerstr.replace('_', ','))
+            model = CoLaLoLa(njets+3, args.ncombos, noutputs,
+                             fflayers=args.fflayers, usebjet=args.use_bjet)
 
-    opt = torch.optim.Adam(model.parameters())
-    losses = {"total": [], "ISR": [], "lep0top": [], "lep1top": [], "had0top": []}
-    if args.alt_loss:
-        losses.update({"penalty_ISR": [], "penalty_lep0top": []})
-
-    #nr_train = 315
-    #batch_size = 315
-    #test_sample = 8000
-    nr_train = 43
-    batch_size = 100
-    test_sample = 1000
-    log.info('Training: %s iterations - batch size %s', nr_train, batch_size)
-    for i in progressbar(range(nr_train)):
-        model.train()
-        opt.zero_grad()
-
-        X, Y = bm.get_torch_batch(batch_size, start_index=i * batch_size + test_sample)
-        P = model(X)
-        Y = Y.reshape(-1, noutputs)
-        P_ISR, Y_ISR = P[:, :njets], Y[:, :njets] #njets flags for ISR or not
-        P_lep0top, Y_lep0top = P[:, njets:njets*2], Y[:, njets:njets*2]
-        P_lep1top, Y_lep1top = P[:, njets*2:njets*3], Y[:, njets*2:njets*3]
-        P_had0top, Y_had0top = P[:, njets*3:njets*4], Y[:, njets*3:njets*4]
-
-        loss = {
-            "ISR": torch.nn.functional.binary_cross_entropy(P_ISR, Y_ISR),
-            "lep0top": torch.nn.functional.binary_cross_entropy(P_lep0top, Y_lep0top),
-            "lep1top": torch.nn.functional.binary_cross_entropy(P_lep1top, Y_lep1top),
-            "had0top": torch.nn.functional.binary_cross_entropy(P_had0top, Y_had0top),
-        }
-        loss["total"] = loss["ISR"]*weights[0] + loss["lep0top"]*weights[1] + loss["lep1top"]*weights[2] + loss["had0top"]*weights[3]
-        if args.one_loss:
-            loss["total"] = loss[args.one_loss]
+        opt = torch.optim.Adam(model.parameters())
+        losses = {"total": [], "ISR": [], "lep0top": [], "lep1top": [], "had0top": []}
         if args.alt_loss:
-            loss["penalty_ISR"] = P_ISR[Y_ISR == 0].mean() + \
-                                  (1 - P_ISR[Y_ISR == 1]).mean()
-            loss["penalty_lep0top"] = P_lep0top[Y_lep0top == 0].mean() + \
-                                    (1 - P_lep0top[Y_lep0top == 1]).mean()
-            loss["total"] += loss["penalty_ISR"] + loss["penalty_lep0top"]
+            losses.update({"penalty_ISR": [], "penalty_lep0top": []})
 
-        for key, val in loss.items():
-            losses[key].append(float(val))
-        loss["total"].backward()
-        opt.step()
+        log.info('Training: %s iterations - batch size %s', nr_train, batch_size)
+        for i in progressbar(range(nr_train)):
+            model.train()
+            opt.zero_grad()
 
-    log.debug('Finished training')
+            X, Y = bm.get_torch_batch(batch_size, start_index=i * batch_size + test_sample)
+            P = model(X)
+            Y = Y.reshape(-1, noutputs)
+            P_ISR, Y_ISR = P[:, :njets], Y[:, :njets] #njets flags for ISR or not
+            P_lep0top, Y_lep0top = P[:, njets:njets*2], Y[:, njets:njets*2]
+            P_lep1top, Y_lep1top = P[:, njets*2:njets*3], Y[:, njets*2:njets*3]
+            P_had0top, Y_had0top = P[:, njets*3:njets*4], Y[:, njets*3:njets*4]
 
-    fig = plt.figure()
-    for losstype, lossvals in losses.items():
-        plt.plot(lossvals, label=losstype)
-    plt.legend()
-    plt.savefig(str(output_dir / 'losses.png'))
+            bkg_factor = 5
+            weight_rebal = torch.ones_like (Y_ISR) / bkg_factor  +  (1.0 - 1.0 / bkg_factor) * Y_ISR
+
+            loss = {
+                "ISR":     torch.nn.functional.binary_cross_entropy(P_ISR, Y_ISR),
+                "lep0top": torch.nn.functional.binary_cross_entropy(P_lep0top, Y_lep0top, weight_rebal),
+                "lep1top": torch.nn.functional.binary_cross_entropy(P_lep1top, Y_lep1top, weight_rebal),
+                "had0top": torch.nn.functional.binary_cross_entropy(P_had0top, Y_had0top),
+            }
+            if args.adapt_weights:
+                weights = [loss["ISR"], loss["lep0top"], loss["lep1top"], loss["had0top"]]
+                weights = [w/sum(weights) for w in weights]
+            loss["total"] = loss["ISR"]*weights[0] + loss["lep0top"]*weights[1] + loss["lep1top"]*weights[2] + loss["had0top"]*weights[3]
+            if args.one_loss:
+                loss["total"] = loss[args.one_loss]
+            if args.alt_loss:
+                loss["penalty_ISR"] = P_ISR[Y_ISR == 0].mean() + \
+                                      (1 - P_ISR[Y_ISR == 1]).mean()
+                loss["penalty_lep0top"] = P_lep0top[Y_lep0top == 0].mean() + \
+                                        (1 - P_lep0top[Y_lep0top == 1]).mean()
+                loss["total"] += loss["penalty_ISR"] + loss["penalty_lep0top"]
+
+            for key, val in loss.items():
+                losses[key].append(float(val))
+            loss["total"].backward()
+            opt.step()
+
+        log.debug('Finished training')
+        torch.save(model, param_file )
 
     pred  = {"ISR": {}, "lep0top": {}, "lep1top": {}, "had0top": {}}
     truth = {"ISR": {}, "lep0top": {}, "lep1top": {}, "had0top": {}}
@@ -218,11 +257,11 @@ if __name__ == '__main__':
     log.info(len(jets["Train"]))
 
     bm_6j = BatchManager2HDM(
-        input_path=args.input_file,
+        input_path=args.input_test_file,
         shuffle_jets=args.shuffle_jets,
         shuffle_events=args.shuffle_events,
         jets_per_event=njets,
-        zero_jets=1, # padding one of the seven jet
+        zero_jets=2, # padding one of the seven jet
         all_partons_included=False,
     )
     log.info('Extracting sample of events with exactly 6 jets')
@@ -247,32 +286,54 @@ if __name__ == '__main__':
     np.savez(str(output_dir / "data.npz"), **flatdict)
 
     #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --do-chi2 --output-dir {out}".format(out=output_dir)
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out}".format(out=output_dir)
-    os.system(cmd)
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --allow-2jet".format(out=output_dir)
-    os.system(cmd)
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores".format(out=output_dir)
-    os.system(cmd)
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores-ISR".format(out=output_dir)
-    os.system(cmd)
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR".format(out=output_dir)
-    os.system(cmd)
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores".format(out=output_dir)
-    os.system(cmd)
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores-ISR".format(out=output_dir)
-    os.system(cmd)
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores --allow-2jet".format(out=output_dir)
-    os.system(cmd)
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores-ISR --allow-2jet".format(out=output_dir)
-    os.system(cmd)
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --allow-2jet".format(out=output_dir)
-    os.system(cmd)
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores --allow-2jet".format(out=output_dir)
-    os.system(cmd)
-    cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores-ISR --allow-2jet".format(out=output_dir)
-    os.system(cmd)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out}".format(out=output_dir)
+    #os.system(cmd)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --allow-2jet".format(out=output_dir)
+    #os.system(cmd)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores".format(out=output_dir)
+    #os.system(cmd)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores-ISR".format(out=output_dir)
+    #os.system(cmd)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR".format(out=output_dir)
+    #os.system(cmd)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores".format(out=output_dir)
+    #os.system(cmd)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores-ISR".format(out=output_dir)
+    #os.system(cmd)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores --allow-2jet".format(out=output_dir)
+    #os.system(cmd)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --normalize-scores-ISR --allow-2jet".format(out=output_dir)
+    #os.system(cmd)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --allow-2jet".format(out=output_dir)
+    #os.system(cmd)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores --allow-2jet".format(out=output_dir)
+    #os.system(cmd)
+    #cmd = "chi2_bench.py --xsttbar-dir ${{ALPACA_DIR}} --npz {out}/data.npz --output-dir {out} --exclude-highest-ISR --normalize-scores-ISR --allow-2jet".format(out=output_dir)
+    #os.system(cmd)
 
-    from alpaca.plot import *
+    if not no_train:
+        losses["ROC_ISR"] = 0
+        losses["ROC_lep0top"] = 0
+        losses["ROC_lep1top"] = 0
+        losses["ROC_had0top"] = 0
+        for ijet in range(njets):
+            losses["ROC_ISR"]     += get_roc_auc(pred["ISR"]["6-jet"][:,ijet],truth["ISR"]["6-jet"][:,ijet])
+            losses["ROC_lep0top"] += get_roc_auc(pred["lep0top"]["6-jet"][:,ijet],truth["lep0top"]["6-jet"][:,ijet])
+            losses["ROC_lep1top"] += get_roc_auc(pred["lep1top"]["6-jet"][:,ijet],truth["lep1top"]["6-jet"][:,ijet])
+            losses["ROC_had0top"] += get_roc_auc(pred["had0top"]["6-jet"][:,ijet],truth["had0top"]["6-jet"][:,ijet])
+        losses["ROC_ISR"]     = [losses["ROC_ISR"]/njets for x in losses["ISR"]]
+        losses["ROC_lep0top"] = [losses["ROC_lep0top"]/njets for x in losses["ISR"]]
+        losses["ROC_lep1top"] = [losses["ROC_lep1top"]/njets for x in losses["ISR"]]
+        losses["ROC_had0top"] = [losses["ROC_had0top"]/njets for x in losses["ISR"]]
+
+        fig = plt.figure()
+        for losstype, lossvals in losses.items():
+            plt.plot(lossvals, label=losstype)
+        plt.ylim([0,1.5])
+        plt.legend(ncol=2)
+        plt.figtext(0.1,0.9,new_dir_name)
+        plt.savefig(str(output_dir / 'losses.png'))
+
     log.info('Plot combination weights')
     if args.simple_nn:
         # No cola plots
