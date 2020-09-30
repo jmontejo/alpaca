@@ -29,8 +29,14 @@ def cli():
     import argparse
     parser = argparse.ArgumentParser(description='ML top-like tagger.')
     parser.add_argument('--debug', action='store_true', help='Debug verbosity')
+    parser.add_argument('--input-file', '-i', required=True, type=Path,
+                        help='path to the file with the input events')
     parser.add_argument('--output-dir', type=Path, default=Path('data'),
                         help='path to the output directory')
+    parser.add_argument('--shuffle-jets', action='store_true',
+                        help='reorder jets in each event')
+    parser.add_argument('--shuffle-events', action='store_true',
+                        help='reorder events in the dataset')
     parser.add_argument('--tag', default='alpaca',
                         help='tag the output')
     subparser = parser.add_subparsers(title='analyses commands',
