@@ -36,14 +36,12 @@ class BaseMain:
 
         njets = 7
         bm = BatchManager(
-            input_path=args.input_file,
-            shuffle_jets=args.shuffle_jets,
-            shuffle_events=args.shuffle_events,
-            jets_per_event=njets
+            input_paths=args.input_files,
+            input_categories=args.input_categories,
         )
         log.info('Nr. of events: %s', bm.get_nr_events())
 
-        model = self.get_model(self)
+        model = self.get_model()
 
         opt = torch.optim.Adam(model.parameters())
         losses = []
