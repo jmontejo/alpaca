@@ -138,11 +138,6 @@ def tj_distr(args, sample=None):
     nevents = len(jets)
     print("Npz file has ",nevents)
 
-    #lead10 = np.concatenate([np.ones(4),np.zeros(nevents-4)])
-    #print(lead10[:12])
-    cut = jets[:,:,3].min(axis=1)>=0 #can cut on exactly 6 jets using ==0
-    #    if not (jets[5].Pt()*GeV>55): continue
-
     #cut = cut & lead10.astype(np.bool)
     jets = jets[cut]
     nevents = len(jets)
