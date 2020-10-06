@@ -33,6 +33,10 @@ def cli():
                         help='path to the output directory')
     parser.add_argument('--tag', default='alpaca',
                         help='tag the output')
+    parser.add_argument('--jets', help='Number of jets to be used', required=True, type=int)
+    parser.add_argument('--outputs', help='Number of output flags', required=True, type=int)
+    parser.add_argument('--categories', help='Number of categories to consider', required=True, type=int)
+
     subparser = parser.add_subparsers(title='analyses commands',
                                       help='sub-command help')
 

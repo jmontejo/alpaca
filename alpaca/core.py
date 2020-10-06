@@ -5,6 +5,9 @@ from alpaca.batch import BatchManager
 from progressbar import progressbar
 
 import alpaca.log
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc
+
 
 __all__ = ['BaseMain']
 
@@ -22,7 +25,7 @@ class BaseMain:
 
     def get_model(self):
         from alpaca.nn.colalola import CoLaLoLa
-        return CoLaLoLa(7, 30, 7 + 5 + 6, fflayers=[200])
+        return CoLaLoLa(self.args.jets, 30, self.args.outputs, fflayers=[200])
 
     def run(self):
         args = self.args
@@ -34,12 +37,7 @@ class BaseMain:
         log.debug('Alpaca has been started and can finally log')
         log.debug(self.args)
 
-        njets = 7
-        bm = BatchManager(
-            input_paths=args.input_files,
-            input_categories=args.input_categories,
-        )
-        log.info('Nr. of events: %s', bm.get_nr_events())
+        log.info('Nr. of events: %s', self.train_bm.get_nr_events())
 
         model = self.get_model()
 
@@ -53,9 +51,9 @@ class BaseMain:
             model.train()
             opt.zero_grad()
 
-            X, Y = bm.get_torch_batch(batch_size, start_index=i * batch_size + 5000)
+            X, Y = self.train_bm.get_torch_batch(batch_size, start_index=i * batch_size + 5000)
             P = model(X)
-            Y = Y.reshape(-1, noutputs)
+            Y = Y.reshape(-1, args.outputs)
 
             loss = torch.nn.functional.binary_cross_entropy(P, Y)
             losses.append(float(loss))
@@ -69,8 +67,8 @@ class BaseMain:
         plt.savefig(str(output_dir / 'losses.png'))
 
         # Run for performance
-        X,Y = bm.get_torch_batch(5000, nr_train * batch_size)
-        P, masses_sig = model(X)
+        X,Y = self.train_bm.get_torch_batch(5000, nr_train * batch_size)
+        P  = model(X)
         _P = P.data.numpy()
         _Y = Y.data.numpy()
 
