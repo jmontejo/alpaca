@@ -51,12 +51,20 @@ def cli():
         b.register_cli(subparser)
 
     args = parser.parse_args()
-    args.outputs = [int(x.lower().replace("n",str(args.jets))) for x in args.outputs.split(",")]
+    try:
+        args.outputs = [int(x.lower().replace("n",str(args.jets))) for x in args.outputs.split(",")]
+    except AttributeError:
+        try: 
+            c = int(args.outputs)
+            args.outputs =  [c]
+        except ValueError:
+            pass
+
     args.totaloutputs = sum(args.outputs)
 
     try:
         c = int(args.categories)
-        args.categories = [ 'category %d'%i for i in range(c)]
+        args.categories = [ 'category_%d'%i for i in range(c)]
     except ValueError:
         pass
     finally:

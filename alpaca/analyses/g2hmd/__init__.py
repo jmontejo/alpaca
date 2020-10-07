@@ -165,15 +165,15 @@ class BatchManager2HDM(BatchManager):
         #rest_stack = np.swapaxes(rest_df.values.reshape(len(df), len(jet_vars), 2), 1, 2)
         rest_stack = rest_df.values
 
-        if shuffle_jets:
+        if args.shuffle_jets:
             # shuffle only does the outermost level
             # iterate through rows to shuffle each event individually
             for row in jet_stack:
                 np.random.shuffle(row)
 
-        if shuffle_events:
-            p = np.random.permutation(len(event_stack))
-            rest_stack = event_stack[p]
+        if args.shuffle_events:
+            p = np.random.permutation(len(rest_stack))
+            rest_stack = rest_stack[p]
             jet_stack = jet_stack[p]
 
         return jet_stack, rest_stack

@@ -1,4 +1,5 @@
 from alpaca.core import BaseMain
+from alpaca.batch import BatchManager
 
 def register_cli(subparser):
 

@@ -16,6 +16,7 @@ def register_cli(subparser):
         "Main"       : Elena, #no quotes, pointer to the class
         "outputs"    : 1,
         "categories" : 1,
+        "jets"       : 6,
     }
 
     # Create your own sub-command and add arguments

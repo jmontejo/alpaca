@@ -52,7 +52,6 @@ class BaseMain:
         log.debug('BatchManager contents is consistent')
 
         nr_train = floor(sqrt(self.train_bm.get_nr_events()-self.test_sample))
-        nr_train = min(200,nr_train)
         batch_size = nr_train
         log.info('Training: %s iterations - batch size %s', nr_train, batch_size)
         for i in progressbar(range(nr_train)):
@@ -65,8 +64,8 @@ class BaseMain:
 
             loss = {'total':0}
             for i,cat in enumerate(args.categories):
-                Pi = P[self.boundaries[i] : self.boundaries[i+1]]
-                Yi = Y[self.boundaries[i] : self.boundaries[i+1]]
+                Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
+                Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
                 loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi)
                 loss['total'] += loss[cat]
 
@@ -90,20 +89,25 @@ class BaseMain:
         P  = model(X)
         _P = P.data.numpy()
         _Y = Y.data.numpy()
+        for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
+            Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
+            Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
 
+            for ijet in range(jets):
 
-        log.info('Plot ROC curve')
-        fpr, tpr, thr = roc_curve(_Y, _P)
-        roc_auc = auc(fpr, tpr)
+                log.info('Plot ROC curve, category %s and output num %d'%(cat,ijet))
+                fpr, tpr, thr = roc_curve(Yi[:,ijet], Pi[:,ijet])
+                roc_auc = auc(fpr, tpr)
 
-        fig = plt.figure()
-        plt.plot(fpr, tpr, color='darkorange',
-                 label='ROC curve (area = {:.2f})'.format(roc_auc))
-        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        #plt.title('Receiver operating characteristic')
-        plt.legend(loc="lower right")
-        plt.savefig(str(output_dir / 'roc_curve.png'))
+                fig = plt.figure()
+                plt.plot(fpr, tpr, color='darkorange',
+                         label='ROC curve (area = {:.2f})'.format(roc_auc))
+                plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+                plt.xlim([0.0, 1.0])
+                plt.ylim([0.0, 1.05])
+                plt.xlabel('False Positive Rate')
+                plt.ylabel('True Positive Rate')
+                #plt.title('Receiver operating characteristic')
+                plt.legend(loc="lower right")
+                plt.savefig(str(output_dir / 'roc_curve_{}_{}.png'.format(cat,ijet)))
+                plt.close()
