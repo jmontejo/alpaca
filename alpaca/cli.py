@@ -38,7 +38,7 @@ def cli():
     parser.add_argument('--extras', help='Number of extra objects to be used', type=int, default=0)
     parser.add_argument('--outputs', help='Number of output flags. Comma-separated list with length equal to the number of categories. \
                                            Can use "N" to read the number of jets. E.g. "N,5,6"')
-    parser.add_argument('--categories', help='Number of categories to consider', type=int)
+    parser.add_argument('--categories', help='Number of categories to consider, or comma-separated list of category names')
 
     subparser = parser.add_subparsers(title='analyses commands',
                                       help='sub-command help')
@@ -52,8 +52,15 @@ def cli():
 
     args = parser.parse_args()
     args.outputs = [int(x.lower().replace("n",str(args.jets))) for x in args.outputs.split(",")]
-    assert len(args.outputs) == args.categories, "Output flags and number of categories don't match: %r %d"%(args.outputs, args.categories)
     args.totaloutputs = sum(args.outputs)
+
+    try:
+        c = int(args.categories)
+        args.categories = [ 'category %d'%i for i in range(c)]
+    except ValueError:
+        pass
+    finally:
+        assert len(args.outputs) == len(args.categories), "Output flags and categories don't match: %r %d"%(args.outputs, args.categories)
 
     main = args.Main(args)
     main.run()

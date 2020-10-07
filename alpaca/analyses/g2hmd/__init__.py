@@ -10,8 +10,19 @@ from alpaca.batch import BatchManager
 log = logging.getLogger(__name__)
 
 def register_cli(subparser):
+
+    analysis_name = '2hdm'
+    analysis_defaults = {
+        "Main"       : Main2HDM, #no quotes, pointer to the class
+        "extras"     : 3,
+        "outputs"    : "n,n,n,n",
+        "jets"       : 6,
+        "categories" : 4,
+        "extra_jet_fields" : ['dl1r'],
+    }
+
     # Create your own sub-command and add arguments
-    parser = subparser.add_parser('2hdm',
+    parser = subparser.add_parser(analysis_name,
                                    help='Hello world sub-command.')
     parser.add_argument('--example', action='store_true',
                         help='example argument')
@@ -22,8 +33,7 @@ def register_cli(subparser):
     parser.add_argument('--shuffle-jets', action='store_true')
     parser.add_argument('--not-all-partons', action='store_true')
 
-    # Set the function corresponding to your subcommand
-    parser.set_defaults(Main=Main2HDM)
+    parser.set_defaults(**analysis_defaults)
 
     return parser
 
@@ -32,13 +42,7 @@ class Main2HDM(BaseMain):
 
     def __init__(self, args):
         super().__init__(args)
-        self.train_bm = BatchManager2HDM(
-                input_paths=args.input_files,
-                jets_per_event = args.jets,
-                shuffle_events = args.shuffle_events,
-                all_partons_included=not args.not_all_partons,
-                extra_info = args.extra_jet_fields,
-            )
+        self.train_bm = BatchManager2HDM(args, zero_jets=2)
         self.test_bm  = []
 
     def plots(self):
@@ -47,23 +51,15 @@ class Main2HDM(BaseMain):
 
 class BatchManager2HDM(BatchManager):
 
-    def __init__(self, input_paths, shuffle_jets=False, shuffle_events=False,
-                 jets_per_event=10, zero_jets=0, all_partons_included=True, extra_info=None):
+    def __init__(self, args, zero_jets=0):
         """Refer to the documentation of the private method `_get_jets`."""
-        labeledjets, rest = self.get_objects(
-            input_paths=input_paths,
-            shuffle_jets=shuffle_jets,
-            shuffle_events=shuffle_events,
-            jets_per_event=jets_per_event,
-            zero_jets=zero_jets,
-            extra_info=extra_info,
-        )
+        labeledjets, rest = self.get_objects(args, zero_jets)
 
         # The rest of this method is about parsing the partonindex labels to
         # to derive the truth labels that can be used by the NN.
         # At the end there is also additional sanitisation of the input files
         # which removes some events.
-        jetsize = 4+len(extra_info)
+        jetsize = 4+len(args.extra_jet_fields)
         jets = labeledjets[:, :, :jetsize] #drop parton index, keep 4-vector + bjet
         labels = np.array(labeledjets[:, :, -1:].squeeze(), dtype=int) #only parton index
 
@@ -104,9 +100,9 @@ class BatchManager2HDM(BatchManager):
             #       (r[njets:njets*3].sum() >= 1) and \
             #       (r[njets*3:].sum() >= 2)
   
-        lep_met_clean = np.array([r for r,t in zip(lep_met,labels) if good_labels(t,all_partons_included)])
-        jets_clean = np.array([r for r,t in zip(jets,labels) if good_labels(t,all_partons_included)])
-        labels_clean = np.array([r for r in labels if good_labels(r,all_partons_included)])
+        lep_met_clean = np.array([r for r,t in zip(lep_met,labels) if good_labels(t,not args.not_all_partons)])
+        jets_clean = np.array([r for r,t in zip(jets,labels) if good_labels(t,not args.not_all_partons)])
+        labels_clean = np.array([r for r in labels if good_labels(r,not args.not_all_partons)])
   
         self._jets = jets_clean
         self._extras = lep_met_clean
@@ -114,17 +110,17 @@ class BatchManager2HDM(BatchManager):
  
 
     @staticmethod
-    def get_objects(input_paths, input_categories=None, shuffle_jets=False, shuffle_events=False,
-                  jets_per_event=10, zero_jets=0, extra_info=None):
+    def get_objects(args, zero_jets):
 
         df_list = []
-        for input_path in input_paths:
+        for input_path in args.input_files:
             tmp_df = pd.read_hdf(input_path, "df")
             df_list.append(tmp_df)
         df = pd.concat(df_list)
         # Get the number of jets per event in the input file by inspecting the
         # second level index of one of the columns
         tot_jets_per_event = len(df['jet_e'].columns.get_level_values('subentry'))
+        jets_per_event = args.jets
   
         if (jets_per_event - zero_jets) > tot_jets_per_event:
             log.warning(
@@ -148,9 +144,9 @@ class BatchManager2HDM(BatchManager):
         #rest_vars = ['lep0_pt','lep0_eta', 'lep0_phi','lep0_e','lep1_pt','lep1_eta', 'lep1_phi','lep1_e','met','met_phi']
         jet_vars = ['jet_px','jet_py','jet_pz','jet_e']
         possible_extras = [ 'dl1r']
-        unused_info = set(extra_info)
+        unused_info = set(args.extra_jet_fields)
         for extra in possible_extras:
-            if extra in extra_info:
+            if extra in args.extra_jet_fields:
                 unused_info.remove(extra)
                 jet_vars.append('jet_'+extra)
         if len(unused_info):
@@ -168,6 +164,17 @@ class BatchManager2HDM(BatchManager):
         jet_stack = jet_stack[:, :jets_per_event, :]
         #rest_stack = np.swapaxes(rest_df.values.reshape(len(df), len(jet_vars), 2), 1, 2)
         rest_stack = rest_df.values
+
+        if shuffle_jets:
+            # shuffle only does the outermost level
+            # iterate through rows to shuffle each event individually
+            for row in jet_stack:
+                np.random.shuffle(row)
+
+        if shuffle_events:
+            p = np.random.permutation(len(event_stack))
+            rest_stack = event_stack[p]
+            jet_stack = jet_stack[p]
 
         return jet_stack, rest_stack
 

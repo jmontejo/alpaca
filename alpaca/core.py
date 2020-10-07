@@ -20,8 +20,10 @@ class BaseMain:
 
     def __init__(self, args):
         self.args = args
-        self.losses = []
         self.test_sample = 2000
+        from itertools import accumulate
+        self.boundaries = list(accumulate([0]+args.outputs))
+        self.losses = {cat:[] for cat in ['total']+args.categories}
 
 
     def get_output_dir(self):
@@ -61,9 +63,16 @@ class BaseMain:
             P = model(X)
             Y = Y.reshape(-1, args.totaloutputs)
 
-            loss = torch.nn.functional.binary_cross_entropy(P, Y)
-            self.losses.append(float(loss))
-            loss.backward()
+            loss = {'total':0}
+            for i,cat in enumerate(args.categories):
+                Pi = P[self.boundaries[i] : self.boundaries[i+1]]
+                Yi = Y[self.boundaries[i] : self.boundaries[i+1]]
+                loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi)
+                loss['total'] += loss[cat]
+
+            for key, val in loss.items():
+                self.losses[key].append(float(val))
+            loss["total"].backward()
             opt.step()
         log.debug('Finished training')
 
@@ -71,7 +80,9 @@ class BaseMain:
         output_dir = self.get_output_dir()
 
         fig = plt.figure()
-        plt.plot(self.losses)
+        for losstype, lossvals in self.losses.items():
+            plt.plot(lossvals, label=losstype)
+        plt.legend()
         plt.savefig(str(output_dir / 'losses.png'))
 
         # Run for performance

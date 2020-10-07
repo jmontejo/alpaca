@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -6,9 +7,19 @@ from alpaca.core import BaseMain
 from alpaca.batch import BatchManager
 
 
+log = logging.getLogger(__name__)
+
 def register_cli(subparser):
+
+    analysis_name = 'elena'
+    analysis_defaults = {
+        "Main"       : Elena, #no quotes, pointer to the class
+        "outputs"    : 1,
+        "categories" : 1,
+    }
+
     # Create your own sub-command and add arguments
-    parser = subparser.add_parser('elena',
+    parser = subparser.add_parser(analysis_name,
                                    help='Hello world sub-command.')
     parser.add_argument('--example', action='store_true',
                         help='example argument')
@@ -21,8 +32,7 @@ def register_cli(subparser):
     parser.add_argument('--shuffle-events', action='store_true')
     parser.add_argument('--shuffle-jets', action='store_true')
 
-    # Set the function corresponding to your subcommand
-    parser.set_defaults(Main=Elena)
+    parser.set_defaults(**analysis_defaults)
 
     return parser
 
