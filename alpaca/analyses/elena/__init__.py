@@ -130,5 +130,4 @@ class BatchManagerElena(BatchManager):
             event_stack = event_stack[p]
             jet_stack = jet_stack[p]
 
-        print(event_stack)
         return jet_stack, event_stack

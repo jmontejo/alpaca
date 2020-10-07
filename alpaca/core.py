@@ -7,6 +7,7 @@ from progressbar import progressbar
 import alpaca.log
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
+from math import sqrt, floor
 
 
 __all__ = ['BaseMain']
@@ -19,18 +20,20 @@ class BaseMain:
 
     def __init__(self, args):
         self.args = args
+        self.losses = []
+        self.test_sample = 2000
+
 
     def get_output_dir(self):
         return self.args.output_dir / self.args.tag
 
-    def get_model(self):
+    def get_model(self, args):
         from alpaca.nn.colalola import CoLaLoLa
-        return CoLaLoLa(self.args.jets, 30, self.args.outputs, fflayers=[200])
+        return CoLaLoLa(self.args.jets, 30, self.args.totaloutputs, fflayers=[200])
 
     def run(self):
         args = self.args
         output_dir = self.get_output_dir()
-
         output_dir.mkdir(parents=True, exist_ok=True)
 
         alpaca.log.setup_logger(file_path=output_dir / 'alpaca.log')
@@ -39,35 +42,40 @@ class BaseMain:
 
         log.info('Nr. of events: %s', self.train_bm.get_nr_events())
 
-        model = self.get_model()
+        model = self.get_model(args)
 
         opt = torch.optim.Adam(model.parameters())
-        losses = []
 
-        nr_train = 250
-        batch_size = 250
+        self.train_bm.is_consistent(args)
+        log.debug('BatchManager contents is consistent')
+
+        nr_train = floor(sqrt(self.train_bm.get_nr_events()-self.test_sample))
+        nr_train = min(200,nr_train)
+        batch_size = nr_train
         log.info('Training: %s iterations - batch size %s', nr_train, batch_size)
         for i in progressbar(range(nr_train)):
             model.train()
             opt.zero_grad()
 
-            X, Y = self.train_bm.get_torch_batch(batch_size, start_index=i * batch_size + 5000)
+            X, Y = self.train_bm.get_torch_batch(batch_size, start_index=i * batch_size + self.test_sample)
             P = model(X)
-            Y = Y.reshape(-1, args.outputs)
+            Y = Y.reshape(-1, args.totaloutputs)
 
             loss = torch.nn.functional.binary_cross_entropy(P, Y)
-            losses.append(float(loss))
+            self.losses.append(float(loss))
             loss.backward()
             opt.step()
-
         log.debug('Finished training')
 
+    #def plots(self): ## should store the NN and then do the plotting as a separate step
+        output_dir = self.get_output_dir()
+
         fig = plt.figure()
-        plt.plot(losses)
+        plt.plot(self.losses)
         plt.savefig(str(output_dir / 'losses.png'))
 
         # Run for performance
-        X,Y = self.train_bm.get_torch_batch(5000, nr_train * batch_size)
+        X,Y = self.train_bm.get_torch_batch(self.test_sample)
         P  = model(X)
         _P = P.data.numpy()
         _Y = Y.data.numpy()

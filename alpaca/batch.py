@@ -56,3 +56,24 @@ class BatchManager:
         """
         # self._jets and self._jetslabels should have the same length
         return len(self._jets)
+
+    def is_consistent(self, args):
+        obs_jets = self._jets.shape[1]
+        obs_jet_comp = self._jets.shape[2]
+        obs_extras = (0 if not hasattr(self,"_extras") else self._extras.shape[1])
+        obs_labels = self._jetlabels.shape[1]
+
+        expected_jets = args.jets
+        expected_jet_comp = 4+len(args.extra_jet_fields)
+        expected_extras = args.extras
+        expected_labels = args.totaloutputs
+
+        assert expected_jets == obs_jets, \
+                "The number of jets in BatchManager (%d) is not consistent with the expected: %d"%(obs_jets, expected_jets)
+        assert expected_jet_comp == obs_jet_comp, \
+                "The jet components in BatchManager (%d) is not consistent with the expected: %d"%(obs_jet_comp, expected_jet_comp)
+        assert expected_extras == obs_extras, \
+                "The number of extra objects in BatchManager (%d) is not consistent with the expected: %d"%(obs_extras, expected_extras)
+        assert expected_labels == obs_labels, \
+                "The number of labels in BatchManager (%d) is not consistent with the expected: %d"%(obs_labels, expected_labels)
+        return True
