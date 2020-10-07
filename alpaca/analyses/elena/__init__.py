@@ -21,7 +21,7 @@ def register_cli(subparser):
 
     # Create your own sub-command and add arguments
     parser = subparser.add_parser(analysis_name,
-                                   help='Hello world sub-command.')
+                                   help='Elena\'s analysis sub-command.')
     parser.add_argument('--example', action='store_true',
                         help='example argument')
     parser.add_argument('--input-files', '-i', required=True, type=Path,
