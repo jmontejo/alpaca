@@ -12,28 +12,51 @@ log = logging.getLogger(__name__)
 
 class BatchManager:
 
-    def __init__(self, input_paths, dfname="df", input_categories=None, shuffle_jets=False, shuffle_events=False,
-                 jets_per_event=10, zero_jets=0, **kwargs):
+    internal_category_name = "alpaca_category"
+
+    def __init__(self, args, dfname="df", **kwargs):
         """ It is *not* recommended to subclass the constructor, please override only get_objects """
 
-        for input_path, category in zip(input_paths, input_categories):
+        from itertools import zip_longest
+        print(args)
+        tmp_jets = []
+        tmp_extras = []
+        tmp_scalars = []
+        tmp_labels = []
+
+        for input_path, category in zip_longest(args.input_files, args.input_categories):
             df = pd.read_hdf(input_path, dfname)
-            df["category" ] = category
+            df[self.internal_category_name] = category
 
             jets, extras, scalars, labels = self.get_objects(
-                df,
-                jets_per_event=jets_per_event,
-                zero_jets=zero_jets,
+                df, args,
                 **kwargs
             )
+            tmp_jets.append(jets)
+            tmp_extras.append(extras)
+            tmp_scalars.append(scalars)
+            tmp_labels.append(labels)
+            print(jets.shape)
+            print(extras.shape)
+            print(scalars.shape)
+            print(labels.shape)
 
-        if shuffle_jets:
+        jets = np.concatenate(tmp_jets)
+        extras = np.concatenate(tmp_extras)
+        scalars = np.concatenate(tmp_scalars)
+        labels = np.concatenate(tmp_labels)
+        print(jets.shape)
+        print(extras.shape)
+        print(scalars.shape)
+        print(labels.shape)
+
+        if args.shuffle_jets:
             # shuffle only does the outermost level
             # iterate through rows to shuffle each event individually
             for row in jets:
                 np.random.shuffle(row)
 
-        if shuffle_events:
+        if args.shuffle_events:
             p = np.random.permutation(len(labels))
             labels  = labels[p]
             jets    = jets[p]
@@ -48,8 +71,7 @@ class BatchManager:
         self.build_flat_arrays()
 
     @staticmethod
-    def get_objects(input_paths, input_categories=None, shuffle_jets=False, shuffle_events=False,
-                  jets_per_event=10, zero_jets=0):
+    def get_objects(df, args, **kwargs):
         ''' Returns a tuple of np.ndarray with the format:
             - jets, extras, scalars, labels
             - jets.shape: (nevents, njets, jetcomponents), jetcomponents is the 4-vector plus possible extra information such as b-tagging score
@@ -60,6 +82,15 @@ class BatchManager:
             - Some of jets/extras/scalars can be None but at least one has to be filled
         '''
         raise NotImplementedError('Please implement get_objects in your BatchManager','See get_objects in batch.py for documentation')
+
+    @staticmethod
+    def get_event_labels(df, ncategories):
+        assert ncategories>=1 and type(ncategories)==int
+        if ncategories == 1:
+            return df[BatchManager.internal_category_name]
+        else:
+            cats = range(ncategories)
+            return np.stack([df[BatchManager.internal_category_name] == c for c in cats],axis=1)
 
     def set_valid_events(self,n):
         self.valid_events = n
@@ -92,8 +123,8 @@ class BatchManager:
         if stop_index > self.get_nr_events():
             log.warning('The stop index is greater than the size of the array')
 
-        X = torch.as_tensor(self._flatarrays, dtype=torch.float)
-        Y = torch.as_tensor(self._labels, dtype=torch.float)
+        X = torch.as_tensor(self._flatarrays[start_index:stop_index, :], dtype=torch.float)
+        Y = torch.as_tensor(self._labels[start_index:stop_index, :], dtype=torch.float)
         return X, Y
 
     def build_flat_arrays(self):
@@ -105,6 +136,7 @@ class BatchManager:
         print("arrays",arrays)
         self._flatarrays = np.concatenate([x.reshape(x.shape[0],-1) for x in arrays],axis=1)
         print(self._flatarrays)
+        print(self._labels)
 
     def get_nr_events(self):
         """Return the length of the internal array which holds all the events.
@@ -134,5 +166,11 @@ class BatchManager:
                 "The number of extra objects in BatchManager (%d) is not consistent with the expected: %d"%(obs_extras, expected_extras)
         assert expected_labels == obs_labels, \
                 "The number of labels in BatchManager (%d) is not consistent with the expected: %d"%(obs_labels, expected_labels)
+
+        test_events = 100
+        assert np.all(self._jets[:test_events,:,3]>=0), \
+                "Negative entries in the fourth jet component. The expected order is Px/Py/Pz/E"
+        assert np.any(self._jets[:test_events,:,0]<0), \
+                "No negative entries in the first jet component. The expected order is Px/Py/Pz/E"
 
         return True

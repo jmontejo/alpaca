@@ -17,6 +17,7 @@ def register_cli(subparser,parentparser):
         "extras"     : 3,
         "outputs"    : "n,n,n,n",
         "jets"       : 6,
+        "zero_jets"  : 1,
         "categories" : 4,
         "extra_jet_fields" : ['dl1r'],
         "scalars"    : ["n_jet","n_bjet"],
@@ -25,21 +26,16 @@ def register_cli(subparser,parentparser):
     # Create your own sub-command and add arguments
     parser = subparser.add_parser(analysis_name, parents=[parentparser],
                                    help='Flavourful 2HDM sub-command.')
-    parser.add_argument('--input-files', '-i', required=True, type=Path,
-                        action='append',
-                        help='path to the file with the input events')
-    parser.add_argument('--shuffle-events', action='store_true')
-    parser.add_argument('--shuffle-jets', action='store_true')
     parser.add_argument('--not-all-partons', action='store_true')
 
-    return analysis_defaults
+    return analysis_name, analysis_defaults
 
 
 class Main2HDM(BaseMain):
 
     def __init__(self, args):
         super().__init__(args)
-        self.train_bm = BatchManager2HDM(args, zero_jets=2)
+        self.train_bm = BatchManager2HDM(args)
         self.test_bm  = []
 
     def plots(self):
@@ -48,79 +44,14 @@ class Main2HDM(BaseMain):
 
 class BatchManager2HDM(BatchManager):
 
-    def __init__(self, args, zero_jets=0):
-        print(args)
-        """Refer to the documentation of the private method `_get_jets`."""
-        labeledjets, rest, scalars = self.get_objects(args, zero_jets)
-
-        # The rest of this method is about parsing the partonindex labels to
-        # to derive the truth labels that can be used by the NN.
-        # At the end there is also additional sanitisation of the input files
-        # which removes some events.
-        jetsize = 4+len(args.extra_jet_fields)
-        jets = labeledjets[:, :, :jetsize] #drop parton index, keep 4-vector + bjet
-        labels = np.array(labeledjets[:, :, -1:].squeeze(), dtype=int) #only parton index
-
-        lep0 = rest[:,:4]
-        lep1 = rest[:,4:8]
-        met  = rest[:,8:]
-        if jetsize == 4:
-            pass
-        elif jetsize == 5:
-            #Fill the btag info for lep+MET outside the DL1r range
-            lep0 = np.concatenate([lep0,np.full([len(lep0),1], -7)],axis=1)
-            lep1 = np.concatenate([lep1,np.full([len(lep1),1], -7)],axis=1)
-            met  = np.concatenate([met, np.full([len(met) ,1], -7)],axis=1)
-        else:
-            log.error("Weird jet size (%d, %r), this will crash"%(jetsize,args.extra_jet_fields))
-            raise WtfIsThis
-  
-        def myjetlabels(labels):
-            myisr = [j!=0 for j in labels]
-            myfromlep0 = [j==1 for j in labels]
-            myfromlep1 = [j==2 for j in labels]
-            myfromhad0 = [j==3 for j in labels]
-            return np.concatenate([myisr,myfromlep0,myfromlep1,myfromhad0],axis=1) #FIXME
-  
-        lep_met = np.stack([lep0,lep1,met],axis=1)
-        lep_met_jets = np.concatenate([lep_met,jets],axis=1)
-        labels = myjetlabels(labels)
-  
-        def good_labels(r,all_partons_included):
-            if not all_partons_included: return True
-  
-            njets = labeledjets.shape[1]
-            return (r[:njets].sum() == 5) and \
-                   (r[njets:njets*2].sum() == 1) and \
-                   (r[njets*2:njets*3].sum() == 1) and \
-                   (r[njets*3:].sum() == 3)
-            #return (r[:njets].sum() >= 3) and \
-            #       (r[njets:njets*3].sum() >= 1) and \
-            #       (r[njets*3:].sum() >= 2)
-  
-        lep_met_clean = np.array([r for r,t in zip(lep_met,labels) if good_labels(t,not args.not_all_partons)])
-        jets_clean = np.array([r for r,t in zip(jets,labels) if good_labels(t,not args.not_all_partons)])
-        labels_clean = np.array([r for r in labels if good_labels(r,not args.not_all_partons)])
-        scalars_clean = np.array([r for r,t in zip(scalars,labels) if good_labels(t,not args.not_all_partons)])
-
-        self._jets = jets_clean
-        self._extras = lep_met_clean
-        self._jetlabels = labels_clean #len njets*4
-        self._scalars = scalars_clean
- 
-
     @staticmethod
-    def get_objects(args, zero_jets):
+    def get_objects(df, args, **kwargs):
 
-        df_list = []
-        for input_path in args.input_files:
-            tmp_df = pd.read_hdf(input_path, "df")
-            df_list.append(tmp_df)
-        df = pd.concat(df_list)
         # Get the number of jets per event in the input file by inspecting the
         # second level index of one of the columns
         tot_jets_per_event = len(df['jet_e'].columns.get_level_values('subentry'))
         jets_per_event = args.jets
+        zero_jets = args.zero_jets
   
         if (jets_per_event - zero_jets) > tot_jets_per_event:
             log.warning(
@@ -170,17 +101,56 @@ class BatchManager2HDM(BatchManager):
         rest_stack = rest_df.values
         scalar_stack = scalar_df.values
 
-        if args.shuffle_jets:
-            # shuffle only does the outermost level
-            # iterate through rows to shuffle each event individually
-            for row in jet_stack:
-                np.random.shuffle(row)
+        # The rest of this method is about parsing the partonindex labels to
+        # to derive the truth labels that can be used by the NN.
+        # At the end there is also additional sanitisation of the input files
+        # which removes some events.
+        jetsize = 4+len(args.extra_jet_fields)
+        jets = jet_stack[:, :, :jetsize] #drop parton index, keep 4-vector + bjet
+        labels = np.array(jet_stack[:, :, -1:].squeeze(), dtype=int) #only parton index
 
-        if args.shuffle_events:
-            p = np.random.permutation(len(rest_stack))
-            rest_stack = rest_stack[p]
-            jet_stack = jet_stack[p]
-            scalar_stack = scalar_stack[p]
+        lep0 = rest_stack[:,:4]
+        lep1 = rest_stack[:,4:8]
+        met  = rest_stack[:,8:]
+        if jetsize == 4:
+            pass
+        elif jetsize == 5:
+            #Fill the btag info for lep+MET outside the DL1r range
+            lep0 = np.concatenate([lep0,np.full([len(lep0),1], -7)],axis=1)
+            lep1 = np.concatenate([lep1,np.full([len(lep1),1], -7)],axis=1)
+            met  = np.concatenate([met, np.full([len(met) ,1], -7)],axis=1)
+        else:
+            log.error("Weird jet size (%d, %r), this will crash"%(jetsize,args.extra_jet_fields))
+            raise WtfIsThis
+  
+        def myjetlabels(labels):
+            myisr = [j!=0 for j in labels]
+            myfromlep0 = [j==1 for j in labels]
+            myfromlep1 = [j==2 for j in labels]
+            myfromhad0 = [j==3 for j in labels]
+            return np.concatenate([myisr,myfromlep0,myfromlep1,myfromhad0],axis=1) #FIXME
+  
+        lep_met = np.stack([lep0,lep1,met],axis=1)
+        lep_met_jets = np.concatenate([lep_met,jets],axis=1)
+        print(args)
+        if args.input_categories:
+            labels = BatchManager.get_event_labels(df, args.ncategories)
+        else:
+            labels = myjetlabels(labels)
 
-        return jet_stack, rest_stack, scalar_stack
+        def good_labels(r,all_partons_included):
+            if not all_partons_included: return True
+  
+            njets = jet_stack.shape[1]
+            return (r[:njets].sum() == 5) and \
+                   (r[njets:njets*2].sum() == 1) and \
+                   (r[njets*2:njets*3].sum() == 1) and \
+                   (r[njets*3:].sum() == 3)
+  
+        lep_met_clean = np.array([r for r,t in zip(lep_met,labels) if good_labels(t,not args.not_all_partons)])
+        jets_clean = np.array([r for r,t in zip(jets,labels) if good_labels(t,not args.not_all_partons)])
+        labels_clean = np.array([r for r in labels if good_labels(r,not args.not_all_partons)])
+        scalars_clean = np.array([r for r,t in zip(scalar_stack,labels) if good_labels(t,not args.not_all_partons)])
+
+        return jets_clean, lep_met_clean, scalars_clean, labels_clean
 

@@ -46,7 +46,6 @@ class LoLa(torch.nn.Module):
         weighted_e = torch.einsum('ij,bj->bi', self.w_ener,combvec[:, :, 0])
         weighted_pz = torch.einsum('ij,bj->bi', self.w_pid,combvec[:, :, 3])
         weighted_extras = {}
-        print("Lola:",self.nextrafields)
         for i in range(self.nextrafields):
             weighted_extras[i] = torch.einsum('ij,bj->bi', self.w_pid,combvec[:, :, 4+i])
         a = combvec[..., :4].unsqueeze(2).repeat(1, 1, self.outputobj, 1)
@@ -54,17 +53,10 @@ class LoLa(torch.nn.Module):
         diff = (a - b)
 
         distances = torch.einsum('bnmi,ij,bnmj->bnm', diff, self.metric, diff)
-        print("Lola:",self.nextrafields)
-
         weighted_d = torch.einsum('nm,bnm->bn', self.w_dist, distances)
-        print("Lola:",self.nextrafields)
-
         masses = torch.einsum('bni,ij,bnj->bn', combvec[..., :4], self.metric,
                               combvec[..., :4])
-        print("Lola:",self.nextrafields)
-
         ptsq = combvec[:, :, 1]**2 + combvec[:, :, 2]**2
-        print("Lola:",self.nextrafields)
 
         outputs = torch.stack([
             masses,
@@ -74,7 +66,6 @@ class LoLa(torch.nn.Module):
             weighted_pz,
             *weighted_extras.values()
         ], dim=-1)
-        print("Lola:",self.nextrafields)
 
         return outputs
 
@@ -95,27 +86,21 @@ class CoLaLoLa(torch.nn.Module):
 
     def forward(self, vectors):
         #truncate vectors in 4-vectors + scalars, feed jets and merge with scalars after LoLa
-        print("In CoLaLoLa")
-        print(vectors.shape)
         if self.nscalars:
             scalars = vectors[:,:self.nscalars]
             vectors = vectors[:,self.nscalars:]
-            print(scalars.shape)
-            print(vectors.shape)
-        vectors = vectors.reshape(vectors.shape[0],self.nobjects,4+self.nextrafields)
-        print(vectors.shape)
+
+        try:
+            vectors = vectors.reshape(vectors.shape[0],self.nobjects,4+self.nextrafields)
+        except RuntimeError as e:
+            print("ColaLola objects %d, objects+combos %d, jet components %d, scalars %d"%(self.nobjects,self.ntotal,4+self.nextrafields,self.nscalars ))
+            raise e
         output = self.cola(vectors)
-        print(output.shape)
         output = self.lola(output)
-        print(output.shape)
         output = output.reshape(output.shape[0], -1)
-        print(output.shape)
         if self.nscalars:
             output = torch.cat([scalars,output],1)
-        print(output.shape)
         output = self.norm(output)
-        print(output.shape)
         output = self.head(output)
-        print(output.shape)
 
         return output

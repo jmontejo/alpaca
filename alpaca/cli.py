@@ -31,12 +31,15 @@ def cli():
     class UniqueAppend(argparse.Action):
         """argparse.Action subclass to store distinct values"""
         def __call__(self, parser, namespace, values, option_string=None):
+            print("UniqueAppend before",namespace,self.dest,values)
             try:
                 getattr(namespace,self.dest).add( values )
             except AttributeError:
                 setattr(namespace,self.dest,set([values]))
+            print("UniqueAppend after",namespace,self.dest,values)
 
-    sharedparser = argparse.ArgumentParser(description='Dummy argparser for shared arguments',add_help=False, argument_default=argparse.SUPPRESS)
+
+    sharedparser = argparse.ArgumentParser(description='Dummy argparser for shared arguments',add_help=False)
 
     parser = argparse.ArgumentParser(description='ML top-like tagger.')
     sharedparser.add_argument('--debug', action='store_true', help='Debug verbosity')
@@ -45,36 +48,47 @@ def cli():
     sharedparser.add_argument('--tag', default='alpaca',
                         help='tag the output')
     sharedparser.add_argument('--jets', help='Number of jets to be used', type=int)
+    sharedparser.add_argument('--zero-jets', help='Number of jet positions that can be left empty', type=int)
     sharedparser.add_argument('--extra-jet-fields', help='Additional information to be included with the jets', action=UniqueAppend, default=[])
     sharedparser.add_argument('--extras', help='Number of extra objects to be used', type=int, default=0)
     sharedparser.add_argument('--outputs', help='Number of output flags. Comma-separated list with length equal to the number of categories. \
                                            Can use "N" to read the number of jets. E.g. "N,5,6"')
     sharedparser.add_argument('--categories', help='Number of categories to consider, or comma-separated list of category names')
-    sharedparser.add_argument('--scalars', help='List of scalar variables to be used in the training', action="append", default=[])
-    sharedparser.add_argument('--analysis_defaults', help='List of scalar variables to be used in the training')
+    sharedparser.add_argument('--scalars', help='List of scalar variables to be used in the training', action=UniqueAppend, default=[])
+    sharedparser.add_argument('--input-files', '-i', required=True, type=Path,
+                        action='append',
+                        help='path to the file with the input events')
+    sharedparser.add_argument('--input-categories', '-ic', type=int,
+                        action='append',
+                        help='path to the file with the input events', default=[])
+    sharedparser.add_argument('--shuffle-events', action='store_true')
+    sharedparser.add_argument('--shuffle-jets', action='store_true')
 
     subparser = parser.add_subparsers(title='analyses commands', dest='subparser')
 
     discovered_plugins = {
-        name.split(".")[-1]: importlib.import_module(name) for finder, name, ispkg in iter_namespace(alpaca.analyses)
+        name: importlib.import_module(name) for finder, name, ispkg in iter_namespace(alpaca.analyses)
     }
 
     analysis_defaults = {}
     for a,b in discovered_plugins.items():
-        analysis_defaults[a] = b.register_cli(subparser,sharedparser)
+        x = b.register_cli(subparser,sharedparser)
+        analysis_defaults.update( dict((x,) ))
 
     chosensubparser = parser.parse_args().subparser
+    print(parser.get_default("scalars"))
     parser.set_defaults(**analysis_defaults[chosensubparser])
+    sharedparser.set_defaults(**analysis_defaults[chosensubparser])
+    print(parser.get_default("scalars"))
     args = parser.parse_args()
+    print(args)
 
-    try:
+    if "," in args.outputs:
         args.outputs = [int(x.lower().replace("n",str(args.jets))) for x in args.outputs.split(",")]
-    except AttributeError:
-        try: 
-            c = int(args.outputs)
-            args.outputs =  [c]
-        except ValueError:
-            pass
+    else:
+        c = int(args.outputs)
+        args.outputs =  [1]*c
+
 
     args.totaloutputs = sum(args.outputs)
     args.nscalars = len(args.scalars)
@@ -84,9 +98,10 @@ def cli():
         c = int(args.categories)
         args.categories = [ 'category_%d'%i for i in range(c)]
     except ValueError:
-        pass
+        args.categories = args.categories.split(",")
     finally:
-        assert len(args.outputs) == len(args.categories), "Output flags and categories don't match: %r %d"%(args.outputs, args.categories)
+        assert len(args.outputs) == len(args.categories), "Output flags and categories don't match: %r %r"%(args.outputs, args.categories)
+    args.ncategories = len(args.categories)
 
     main = args.Main(args)
     main.run()

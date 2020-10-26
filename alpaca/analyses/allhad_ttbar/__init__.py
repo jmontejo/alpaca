@@ -24,14 +24,9 @@ def register_cli(subparser, parentparser):
     # Create your own sub-command and add arguments
     parser = subparser.add_parser(analysis_name, parents=[parentparser],
                                    help='All-hadronic ttbar sub-command.')
-    parser.add_argument('--input-files', '-i', required=True, type=Path,
-                        action='append',
-                        help='path to the file with the input events')
-    parser.add_argument('--shuffle-events', action='store_true')
-    parser.add_argument('--shuffle-jets', action='store_true')
     parser.add_argument('--not-all-partons', action='store_true')
 
-    return analysis_defaults
+    return analysis_name, analysis_defaults
 
 
 class MainTtbar(BaseMain):

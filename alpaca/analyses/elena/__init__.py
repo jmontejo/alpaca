@@ -26,16 +26,8 @@ def register_cli(subparser, parentparser):
                                    help='Elena\'s analysis sub-command.')
     parser.add_argument('--example', action='store_true',
                         help='example argument')
-    parser.add_argument('--input-files', '-i', required=True, type=Path,
-                        action='append',
-                        help='path to the file with the input events')
-    parser.add_argument('--input-categories', '-ic', required=True, type=int,
-                        action='append',
-                        help='path to the file with the input events')
-    parser.add_argument('--shuffle-events', action='store_true')
-    parser.add_argument('--shuffle-jets', action='store_true')
 
-    return analysis_defaults
+    return analysis_name, analysis_defaults
 
 
 class Elena(BaseMain):
@@ -54,8 +46,7 @@ class Elena(BaseMain):
 class BatchManagerElena(BatchManager):
 
     @staticmethod
-    def get_objects(df, 
-                  jets_per_event=10, zero_jets=0):
+    def get_objects(df, args, **kwargs):
         """Function that reads an input file and returns a numpy array properly
         formatted, ready to be converted to pytorch tensors.
 
@@ -100,6 +91,8 @@ class BatchManagerElena(BatchManager):
         # Get the number of jets per event in the input file by inspecting the
         # second level index of one of the columns
         tot_jets_per_event = len(df['partonindex'].columns.get_level_values('subentry'))
+        jets_per_event = args.jets
+        zero_jets = args.zero_jets
 
         if (jets_per_event - zero_jets) > tot_jets_per_event:
             log.warning(

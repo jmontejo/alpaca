@@ -9,13 +9,13 @@ def register_cli(subparser,parentparser):
         "example"    : False,
     }
 
-    # Create your own sub-command and add arguments
+    # Create your own sub-command and add arguments, all common arguments are inherited via parentparser
     parser = subparser.add_parser(analysis_name, parents=[parentparser],
                                    help='Hello world sub-command.')
     parser.add_argument('--example', action='store_true',
                         help='example argument')
 
-    return analysis_defaults
+    return analysis_name, analysis_defaults
 
 
 class HelloWorld(BaseMain):

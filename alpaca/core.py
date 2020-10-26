@@ -20,7 +20,7 @@ class BaseMain:
 
     def __init__(self, args):
         self.args = args
-        self.test_sample = 2000
+        self.test_sample = 5000
         from itertools import accumulate
         self.boundaries = list(accumulate([0]+args.outputs))
         self.losses = {cat:[] for cat in ['total']+args.categories}
@@ -85,13 +85,12 @@ class BaseMain:
         plt.savefig(str(output_dir / 'losses.png'))
 
         # Run for performance
-        for bm in self.train_bm + self.valid_bm:
-            X,Y = self.train_bm.get_torch_batch(self.test_sample)
+        for bm in [self.train_bm] + self.test_bm:
+            X,Y = bm.get_torch_batch(self.test_sample)
             P  = model(X)
             _P = P.data.numpy()
             _Y = Y.data.numpy()
             #FIXME, think about many bm plots
-
 
 
         for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
