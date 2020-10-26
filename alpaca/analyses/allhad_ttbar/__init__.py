@@ -9,7 +9,7 @@ from alpaca.batch import BatchManager
 
 log = logging.getLogger(__name__)
 
-def register_cli(subparser):
+def register_cli(subparser, parentparser):
 
     analysis_name = 'allhad_ttbar'
     analysis_defaults = {
@@ -22,7 +22,7 @@ def register_cli(subparser):
     }
 
     # Create your own sub-command and add arguments
-    parser = subparser.add_parser(analysis_name,
+    parser = subparser.add_parser(analysis_name, parents=[parentparser],
                                    help='All-hadronic ttbar sub-command.')
     parser.add_argument('--input-files', '-i', required=True, type=Path,
                         action='append',
@@ -31,9 +31,7 @@ def register_cli(subparser):
     parser.add_argument('--shuffle-jets', action='store_true')
     parser.add_argument('--not-all-partons', action='store_true')
 
-    parser.set_defaults(**analysis_defaults)
-
-    return parser
+    return analysis_defaults
 
 
 class MainTtbar(BaseMain):

@@ -1,7 +1,7 @@
 from alpaca.core import BaseMain
 from alpaca.batch import BatchManager
 
-def register_cli(subparser):
+def register_cli(subparser,parentparser):
 
     analysis_name = 'hello-world'
     analysis_defaults = {
@@ -10,14 +10,12 @@ def register_cli(subparser):
     }
 
     # Create your own sub-command and add arguments
-    parser = subparser.add_parser(analysis_name,
+    parser = subparser.add_parser(analysis_name, parents=[parentparser],
                                    help='Hello world sub-command.')
     parser.add_argument('--example', action='store_true',
                         help='example argument')
 
-    parser.set_defaults(**analysis_defaults)
-
-    return parser
+    return analysis_defaults
 
 
 class HelloWorld(BaseMain):

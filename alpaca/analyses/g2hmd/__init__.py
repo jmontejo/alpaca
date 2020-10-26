@@ -9,7 +9,7 @@ from alpaca.batch import BatchManager
 
 log = logging.getLogger(__name__)
 
-def register_cli(subparser):
+def register_cli(subparser,parentparser):
 
     analysis_name = '2hdm'
     analysis_defaults = {
@@ -19,10 +19,11 @@ def register_cli(subparser):
         "jets"       : 6,
         "categories" : 4,
         "extra_jet_fields" : ['dl1r'],
+        "scalars"    : ["n_jet","n_bjet"],
     }
 
     # Create your own sub-command and add arguments
-    parser = subparser.add_parser(analysis_name,
+    parser = subparser.add_parser(analysis_name, parents=[parentparser],
                                    help='Flavourful 2HDM sub-command.')
     parser.add_argument('--input-files', '-i', required=True, type=Path,
                         action='append',
@@ -31,9 +32,7 @@ def register_cli(subparser):
     parser.add_argument('--shuffle-jets', action='store_true')
     parser.add_argument('--not-all-partons', action='store_true')
 
-    parser.set_defaults(**analysis_defaults)
-
-    return parser
+    return analysis_defaults
 
 
 class Main2HDM(BaseMain):
@@ -50,8 +49,9 @@ class Main2HDM(BaseMain):
 class BatchManager2HDM(BatchManager):
 
     def __init__(self, args, zero_jets=0):
+        print(args)
         """Refer to the documentation of the private method `_get_jets`."""
-        labeledjets, rest = self.get_objects(args, zero_jets)
+        labeledjets, rest, scalars = self.get_objects(args, zero_jets)
 
         # The rest of this method is about parsing the partonindex labels to
         # to derive the truth labels that can be used by the NN.
@@ -72,7 +72,7 @@ class BatchManager2HDM(BatchManager):
             lep1 = np.concatenate([lep1,np.full([len(lep1),1], -7)],axis=1)
             met  = np.concatenate([met, np.full([len(met) ,1], -7)],axis=1)
         else:
-            log.error("Weird jet size (%d), this will crash"%jetsize)
+            log.error("Weird jet size (%d, %r), this will crash"%(jetsize,args.extra_jet_fields))
             raise WtfIsThis
   
         def myjetlabels(labels):
@@ -101,10 +101,12 @@ class BatchManager2HDM(BatchManager):
         lep_met_clean = np.array([r for r,t in zip(lep_met,labels) if good_labels(t,not args.not_all_partons)])
         jets_clean = np.array([r for r,t in zip(jets,labels) if good_labels(t,not args.not_all_partons)])
         labels_clean = np.array([r for r in labels if good_labels(r,not args.not_all_partons)])
-  
+        scalars_clean = np.array([r for r,t in zip(scalars,labels) if good_labels(t,not args.not_all_partons)])
+
         self._jets = jets_clean
         self._extras = lep_met_clean
         self._jetlabels = labels_clean #len njets*4
+        self._scalars = scalars_clean
  
 
     @staticmethod
@@ -157,11 +159,16 @@ class BatchManager2HDM(BatchManager):
         jet_df = df[jet_vars]
         rest_df = df[rest_vars].droplevel(1,axis=1)
         rest_df = rest_df.loc[:,~rest_df.columns.duplicated()]
+
+        scalar_vars = ['n_jet','n_bjet']
+        scalar_df = df[scalar_vars].droplevel(1,axis=1)
+        scalar_df = scalar_df.loc[:,~scalar_df.columns.duplicated()]
   
         jet_stack = np.swapaxes(jet_df.values.reshape(len(df), len(jet_vars), maxjets), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
         #rest_stack = np.swapaxes(rest_df.values.reshape(len(df), len(jet_vars), 2), 1, 2)
         rest_stack = rest_df.values
+        scalar_stack = scalar_df.values
 
         if args.shuffle_jets:
             # shuffle only does the outermost level
@@ -173,6 +180,7 @@ class BatchManager2HDM(BatchManager):
             p = np.random.permutation(len(rest_stack))
             rest_stack = rest_stack[p]
             jet_stack = jet_stack[p]
+            scalar_stack = scalar_stack[p]
 
-        return jet_stack, rest_stack
+        return jet_stack, rest_stack, scalar_stack
 

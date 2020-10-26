@@ -31,7 +31,7 @@ class BaseMain:
 
     def get_model(self, args):
         from alpaca.nn.colalola import CoLaLoLa
-        return CoLaLoLa(self.args.jets, 30, self.args.totaloutputs, fflayers=[200])
+        return CoLaLoLa(self.args.jets+self.args.extras, 30, self.args.totaloutputs, nscalars=self.args.nscalars,nextrafields=self.args.nextrafields,fflayers=[200])
 
     def run(self):
         args = self.args
@@ -85,10 +85,15 @@ class BaseMain:
         plt.savefig(str(output_dir / 'losses.png'))
 
         # Run for performance
-        X,Y = self.train_bm.get_torch_batch(self.test_sample)
-        P  = model(X)
-        _P = P.data.numpy()
-        _Y = Y.data.numpy()
+        for bm in self.train_bm + self.valid_bm:
+            X,Y = self.train_bm.get_torch_batch(self.test_sample)
+            P  = model(X)
+            _P = P.data.numpy()
+            _Y = Y.data.numpy()
+            #FIXME, think about many bm plots
+
+
+
         for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
             Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
             Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]

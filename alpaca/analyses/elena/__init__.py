@@ -9,7 +9,7 @@ from alpaca.batch import BatchManager
 
 log = logging.getLogger(__name__)
 
-def register_cli(subparser):
+def register_cli(subparser, parentparser):
 
     analysis_name = 'elena'
     analysis_defaults = {
@@ -17,10 +17,12 @@ def register_cli(subparser):
         "outputs"    : 1,
         "categories" : 1,
         "jets"       : 6,
+        #"input_files":["truthmatched.h5","truthmatched_unfiltered.h5"],
+        #"input_categories":[1,0],
     }
 
     # Create your own sub-command and add arguments
-    parser = subparser.add_parser(analysis_name,
+    parser = subparser.add_parser(analysis_name, parents=[parentparser],
                                    help='Elena\'s analysis sub-command.')
     parser.add_argument('--example', action='store_true',
                         help='example argument')
@@ -33,9 +35,7 @@ def register_cli(subparser):
     parser.add_argument('--shuffle-events', action='store_true')
     parser.add_argument('--shuffle-jets', action='store_true')
 
-    parser.set_defaults(**analysis_defaults)
-
-    return parser
+    return analysis_defaults
 
 
 class Elena(BaseMain):
@@ -54,7 +54,7 @@ class Elena(BaseMain):
 class BatchManagerElena(BatchManager):
 
     @staticmethod
-    def get_objects(input_paths, input_categories=None, shuffle_jets=False, shuffle_events=False,
+    def get_objects(df, 
                   jets_per_event=10, zero_jets=0):
         """Function that reads an input file and returns a numpy array properly
         formatted, ready to be converted to pytorch tensors.
@@ -96,13 +96,7 @@ class BatchManagerElena(BatchManager):
         (0 = not top jet, 1-3 = b,Wa,Wb from top, 4-6 ditto from antitop).
 
         """
-        df_list = []
-        for input_path, category in zip(input_paths, input_categories):
-            tmp_df = pd.read_hdf(input_path, "df")
-            tmp_df["category" ] = category
-            df_list.append(tmp_df)
-            print(input_path, category)
-        df = pd.concat(df_list)
+
         # Get the number of jets per event in the input file by inspecting the
         # second level index of one of the columns
         tot_jets_per_event = len(df['partonindex'].columns.get_level_values('subentry'))
@@ -130,15 +124,5 @@ class BatchManagerElena(BatchManager):
         # So segment and swap axes to group by jet
         jet_stack = np.swapaxes(jet_df.values.reshape(len(jet_df), len(jet_vars), maxjets), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
-        if shuffle_jets:
-            # shuffle only does the outermost level
-            # iterate through rows to shuffle each event individually
-            for row in jet_stack:
-                np.random.shuffle(row)
 
-        if shuffle_events:
-            p = np.random.permutation(len(event_stack))
-            event_stack = event_stack[p]
-            jet_stack = jet_stack[p]
-
-        return jet_stack, event_stack
+        return jet_stack, None, None, event_stack
