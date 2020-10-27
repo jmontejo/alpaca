@@ -18,7 +18,6 @@ class BatchManager:
         """ It is *not* recommended to subclass the constructor, please override only get_objects """
 
         from itertools import zip_longest
-        print(args)
         tmp_jets = []
         tmp_extras = []
         tmp_scalars = []
@@ -32,25 +31,18 @@ class BatchManager:
                 df, args,
                 **kwargs
             )
-            tmp_jets.append(jets)
-            tmp_extras.append(extras)
-            tmp_scalars.append(scalars)
+
+            if jets is not None: tmp_jets.append(jets)
+            if extras is not None: tmp_extras.append(extras)
+            if scalars is not None: tmp_scalars.append(scalars)
             tmp_labels.append(labels)
-            print(jets.shape)
-            print(extras.shape)
-            print(scalars.shape)
-            print(labels.shape)
 
-        jets = np.concatenate(tmp_jets)
-        extras = np.concatenate(tmp_extras)
-        scalars = np.concatenate(tmp_scalars)
+        jets = np.concatenate(tmp_jets) if tmp_jets else None
+        extras = np.concatenate(tmp_extras) if tmp_extras else None
+        scalars = np.concatenate(tmp_scalars) if tmp_scalars else None
         labels = np.concatenate(tmp_labels)
-        print(jets.shape)
-        print(extras.shape)
-        print(scalars.shape)
-        print(labels.shape)
 
-        if args.shuffle_jets:
+        if args.shuffle_jets and jets:
             # shuffle only does the outermost level
             # iterate through rows to shuffle each event individually
             for row in jets:
@@ -59,9 +51,9 @@ class BatchManager:
         if args.shuffle_events:
             p = np.random.permutation(len(labels))
             labels  = labels[p]
-            jets    = jets[p]
-            extras  = extras[p]
-            scalars = scalars[p]
+            if jets is not None: jets    = jets[p]
+            if extras is not None: extras  = extras[p]
+            if scalars is not None: scalars = scalars[p]
 
         self._jets    = jets
         self._extras  = extras
@@ -133,10 +125,7 @@ class BatchManager:
         if self._jets is not None: arrays.append(self._jets)
         if self._extras is not None: arrays.append(self._extras)
         if self._scalars is not None:  arrays.append(self._scalars)
-        print("arrays",arrays)
         self._flatarrays = np.concatenate([x.reshape(x.shape[0],-1) for x in arrays],axis=1)
-        print(self._flatarrays)
-        print(self._labels)
 
     def get_nr_events(self):
         """Return the length of the internal array which holds all the events.
@@ -156,7 +145,7 @@ class BatchManager:
         obs_jets = self._jets.shape[1] if objs_njets else 0
         obs_jet_comp = self._jets.shape[2] if objs_njets else expected_jet_comp
         obs_extras = self._extras.shape[1] if objs_nextras else 0 
-        obs_labels = self._labels.shape[1] if objs_njets else 0
+        obs_labels = self._labels.shape[1]
 
         assert expected_jets == obs_jets, \
                 "The number of jets in BatchManager (%d) is not consistent with the expected: %d"%(obs_jets, expected_jets)
@@ -168,9 +157,10 @@ class BatchManager:
                 "The number of labels in BatchManager (%d) is not consistent with the expected: %d"%(obs_labels, expected_labels)
 
         test_events = 100
-        assert np.all(self._jets[:test_events,:,3]>=0), \
+        if objs_njets:
+            assert np.all(self._jets[:test_events,:,3]>=0), \
                 "Negative entries in the fourth jet component. The expected order is Px/Py/Pz/E"
-        assert np.any(self._jets[:test_events,:,0]<0), \
+            assert np.any(self._jets[:test_events,:,0]<0), \
                 "No negative entries in the first jet component. The expected order is Px/Py/Pz/E"
 
         return True

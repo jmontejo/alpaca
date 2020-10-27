@@ -31,12 +31,10 @@ def cli():
     class UniqueAppend(argparse.Action):
         """argparse.Action subclass to store distinct values"""
         def __call__(self, parser, namespace, values, option_string=None):
-            print("UniqueAppend before",namespace,self.dest,values)
             try:
                 getattr(namespace,self.dest).add( values )
             except AttributeError:
                 setattr(namespace,self.dest,set([values]))
-            print("UniqueAppend after",namespace,self.dest,values)
 
 
     sharedparser = argparse.ArgumentParser(description='Dummy argparser for shared arguments',add_help=False)
@@ -63,6 +61,11 @@ def cli():
                         help='path to the file with the input events', default=[])
     sharedparser.add_argument('--shuffle-events', action='store_true')
     sharedparser.add_argument('--shuffle-jets', action='store_true')
+    sharedparser.add_argument('--fast', action='store_true',help="Run only over sqrt(N) events for a fast test")
+
+    nnchoice = sharedparser.add_mutually_exclusive_group()
+    nnchoice.add_argument("--simple-nn",action="store_true")
+    nnchoice.add_argument("--cola-lola",action="store_true")
 
     subparser = parser.add_subparsers(title='analyses commands', dest='subparser')
 
@@ -76,12 +79,9 @@ def cli():
         analysis_defaults.update( dict((x,) ))
 
     chosensubparser = parser.parse_args().subparser
-    print(parser.get_default("scalars"))
     parser.set_defaults(**analysis_defaults[chosensubparser])
     sharedparser.set_defaults(**analysis_defaults[chosensubparser])
-    print(parser.get_default("scalars"))
     args = parser.parse_args()
-    print(args)
 
     if "," in args.outputs:
         args.outputs = [int(x.lower().replace("n",str(args.jets))) for x in args.outputs.split(",")]

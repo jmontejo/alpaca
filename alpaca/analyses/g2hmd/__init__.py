@@ -21,6 +21,7 @@ def register_cli(subparser,parentparser):
         "categories" : 4,
         "extra_jet_fields" : ['dl1r'],
         "scalars"    : ["n_jet","n_bjet"],
+        "shuffle_events": True,
     }
 
     # Create your own sub-command and add arguments
@@ -151,6 +152,11 @@ class BatchManager2HDM(BatchManager):
         jets_clean = np.array([r for r,t in zip(jets,labels) if good_labels(t,not args.not_all_partons)])
         labels_clean = np.array([r for r in labels if good_labels(r,not args.not_all_partons)])
         scalars_clean = np.array([r for r,t in zip(scalar_stack,labels) if good_labels(t,not args.not_all_partons)])
+
+        if args.extras == 0:
+            lep_met_clean = None
+        if args.jets == 0:
+            jets_clean = None
 
         return jets_clean, lep_met_clean, scalars_clean, labels_clean
 

@@ -30,8 +30,12 @@ class BaseMain:
         return self.args.output_dir / self.args.tag
 
     def get_model(self, args):
-        from alpaca.nn.colalola import CoLaLoLa
-        return CoLaLoLa(self.args.jets+self.args.extras, 30, self.args.totaloutputs, nscalars=self.args.nscalars,nextrafields=self.args.nextrafields,fflayers=[200])
+        if args.simple_nn:
+            from alpaca.nn.simple import SimpleNN
+            return SimpleNN((self.args.jets+self.args.extras)*(4+self.args.nextrafields) + self.args.nscalars, self.args.totaloutputs, fflayers=[200])
+        else: #ColaLola is default
+            from alpaca.nn.colalola import CoLaLoLa
+            return CoLaLoLa(self.args.jets+self.args.extras, 30, self.args.totaloutputs, nscalars=self.args.nscalars,nextrafields=self.args.nextrafields,fflayers=[200])
 
     def run(self):
         args = self.args
@@ -52,6 +56,7 @@ class BaseMain:
         log.debug('BatchManager contents is consistent')
 
         nr_train = floor(sqrt(self.train_bm.get_nr_events()-self.test_sample))
+        if args.fast: nr_train = int(sqrt(nr_train))
         batch_size = nr_train
         log.info('Training: %s iterations - batch size %s', nr_train, batch_size)
         for i in progressbar(range(nr_train)):
@@ -83,6 +88,7 @@ class BaseMain:
             plt.plot(lossvals, label=losstype)
         plt.legend()
         plt.savefig(str(output_dir / 'losses.png'))
+        plt.close()
 
         # Run for performance
         for bm in [self.train_bm] + self.test_bm:
