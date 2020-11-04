@@ -94,7 +94,6 @@ class BatchManagerTtbarChiara(BatchManager):
 
         # The input rows have all jet px, all jet py, ... all jet partonindex
         # So segment and swap axes to group by jet
-        print(df.shape)
         jet_stack = np.swapaxes(df.values.reshape(len(df), 5, 10), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
 

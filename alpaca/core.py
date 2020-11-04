@@ -4,6 +4,8 @@ import torch
 from alpaca.batch import BatchManager
 from progressbar import progressbar
 
+import pandas as pd
+
 import alpaca.log
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
@@ -20,7 +22,7 @@ class BaseMain:
 
     def __init__(self, args):
         self.args = args
-        self.test_sample = 5000
+        self.test_sample = 100000
         from itertools import accumulate
         self.boundaries = list(accumulate([0]+args.outputs))
         self.losses = {cat:[] for cat in ['total']+args.categories}
@@ -97,7 +99,32 @@ class BaseMain:
             _P = P.data.numpy()
             _Y = Y.data.numpy()
             #FIXME, think about many bm plots
+            # chiara: the way it is it's just looking at the training sample right? 
+            
+        print('type(P)')
+        print(type(P))
+        print('type(_P)')
+        print(type(_P))
+        print('shape P')
+        print(P.shape)
+        print('shape _P')
+        print(_P.shape)
+        
+        # chiara: ugly and hardcoded, just to test
+        _X = X.data.numpy()
+        jet_vars = ['jet_px','jet_py','jet_pz','jet_e']
+        col_X = [j+'_'+str(i) for i in range(self.args.jets) for j in jet_vars]
+        df_X = pd.DataFrame(data = _X, columns=col_X)
 
+        col_P = ['from_top_'+str(j) for j in range(7)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
+        df_P = pd.DataFrame(data = _P, columns=col_P)
+
+        col_Y = [p+'_true' for p in col_P]
+        df_Y = pd.DataFrame(data = _Y, columns=col_Y)
+
+        df_test = pd.concat([df_X, df_P, df_Y], axis=1, sort=False)
+        
+        df_test.to_csv('mytest.csv')
 
         for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
             Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
