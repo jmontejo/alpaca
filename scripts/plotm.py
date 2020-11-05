@@ -2,15 +2,15 @@ import pandas as pd
 import numpy as np 
 from root_pandas import to_root
 import ROOT
+from array import array
 
 filename='/Users/crizzi/lavoro/SUSY/RPV/alpaca_mio/mytest.csv'
 df=pd.read_csv(filename)
 #print(df.head())
 #print(df.columns)
-fname='out.root'
-tname='mytree'
+fname='df_alpaca.root'
+tname='tree_alpaca'
 to_root(df, fname, key=tname)
-
 # branches
 # 'jet_px_0', 'jet_py_0', 'jet_pz_0', 'jet_e_0' ... 'jet_e_6'
 # 'from_top_0' ... 'from_top_6'
@@ -19,6 +19,20 @@ to_root(df, fname, key=tname)
 # 'from_top_0_true' ... 'from_top_6_true'
 # 'same_as_lead_0_true' ... 'same_as_lead_4_true' 
 # 'is_b_0_true' ... 'is_b_5_true'
+
+fname_out = 'outtree.root'
+tname_out = 'tree_alpaca'
+f_out = ROOT.TFile.Open(fname_out,'RECREATE')
+t_out = ROOT.TTree(tname_out, tname_out)
+
+mt1_reco  = array('d',[0])
+mt1_true  = array('d',[0])
+mt2_reco  = array('d',[0])
+mt2_true  = array('d',[0])
+t_out.Branch("mt1_reco",  mt1_reco, "mt1_reco/D")
+t_out.Branch("mt2_reco",  mt2_reco, "mt2_reco/D")
+t_out.Branch("mt1_true",  mt1_true, "mt1_true/D")
+t_out.Branch("mt2_true",  mt2_true, "mt2_true/D")
 
 f=ROOT.TFile.Open(fname,'READ')
 t=f.Get(tname)
@@ -40,25 +54,20 @@ for ientry in range(nentries):
         jets_all.append(ROOT.TLorentzVector())
     for i,v in enumerate(jet_vars):
         jets_all[i].SetPxPyPzE(v[0]/1000., v[1]/1000., v[2]/1000., v[3]/1000.) # convert to GeV
-    # print('mass of each jet')
-    # for j in jets_all:
-    #    print(j.M())
+    
     from_top = [t.from_top_0, t.from_top_1, t.from_top_2, t.from_top_3, t.from_top_4, t.from_top_5, t.from_top_6]
-    # print(from_top)
     val, idx_isr = min((val, idx_isr) for (idx_isr, val) in enumerate(from_top))
     # print(val, idx_isr)
     pred_from_top = [1 for i in range(njets)]
     pred_from_top[idx_isr]=0
     # print(pred_from_top)
     jets = [j for i,j in enumerate(jets_all) if pred_from_top[i]>0] # remove jet from ISR
-    # print('mass of each jet')
-    # for j in jets:
-        # print(j.M())    
+
     is_b = [t.is_b_0, t.is_b_1, t.is_b_2, t.is_b_3, t.is_b_4, t.is_b_5]
-    # print(is_b)
+    # find first b
     val, idx_b1 = max((val, idx_b1) for (idx_b1, val) in enumerate(is_b))
     is_b_appo = is_b.copy()
-    is_b_appo[idx_b1]=0    
+    is_b_appo[idx_b1]=0 # put it temporary at zero to find second b
     val, idx_b2 = max((val, idx_b2) for (idx_b2, val) in enumerate(is_b_appo))
     pred_is_b = [0 for i in range(njets)]
     pred_is_b[idx_b1]=1
@@ -94,18 +103,20 @@ for ientry in range(nentries):
     t2_list_true = [t for i,t in enumerate(jets_true) if true_same_as_lead[i]<1]
     t2_true = t2_list_true[0]+t2_list_true[1]+t2_list_true[2]
 
-    if t2.Pt() > t1.Pt(): # call t1 the top with leading pt
-        t_appo = t1
-        t1 = t2 
-        t2 = t_appo
-    if t2_true.Pt() > t1_true.Pt(): # call t1 the top with leading pt
-        t_appo_true = t1_true
-        t1_true = t2_true
-        t2_true = t_appo_true
+    if t2.Pt() > t1.Pt(): t1,t2=t2,t1 # call t1 the top with leading pt
+    if t2_true.Pt() > t1_true.Pt(): t1_true,t2_true=t2_true,t1_true  # call t1 the top with leading pt
+
+    mt1_reco[0] = t1.M()
+    mt2_reco[0] = t2.M()
+    mt1_true[0] = t1_true.M()
+    mt2_true[0] = t2_true.M()
+    t_out.Fill()
 
     if ientry%1000==0:
         print(ientry)
         print('M1 reco:',t1.M(),      ' M2 reco:',t2.M())
         print('M1 true:',t1_true.M(), ' M2 true:',t2_true.M())
 
-
+f_out.Write()
+f_out.Close()
+f.Close()
