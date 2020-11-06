@@ -156,6 +156,7 @@ class BatchManagerTtbarChiara(BatchManager):
         # isbjet = np.array( [ np.equal(r,1) | np.equal(r,4) for r in labels] )
         # jetlabels = np.concatenate([jetfromttbar.squeeze(),topmatch[:,1:],isbjet],1)
 
+
         # Check that the encoded events have the expected number of positive
         # labels. This cleanup is a consequence of the truth matching script
         # that created the input, so this next bit makes sure that the labels
@@ -164,18 +165,20 @@ class BatchManagerTtbarChiara(BatchManager):
         def good_labels(r,all_partons_included):
             if not all_partons_included: return True
             if qcd_like: return True
-
+            
             njets = labeledjets.shape[1]
             return (r[:njets].sum() == 6) and \
-                   (r[njets:njets+5].sum() == 2) and \
-                   (r[njets+5:].sum() == 2)
-
+                (r[njets:njets+5].sum() == 2) and \
+                (r[njets+5:].sum() == 2)
+        
         select_clean = np.array([good_labels(r,all_partons_included) for r in jetlabels])
-        jets_clean = jets[select_clean]
-        jetlabels_clean = jetlabels[select_clean]
-        event_number_clean = event_number[select_clean]
 
-        return jets_clean,None,None, jetlabels_clean, event_number_clean
-
+        if args.train:
+            jets_clean = jets[select_clean]
+            jetlabels_clean = jetlabels[select_clean]
+            event_number_clean = event_number[select_clean]
+            return jets_clean,None,None, jetlabels_clean, event_number_clean
+        else:
+            return jets,None,None, jetlabels, np.vstack((event_number,select_clean)).T
  
 

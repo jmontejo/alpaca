@@ -128,7 +128,11 @@ class BaseMain:
         col_X = [j+'_'+str(i) for i in range(self.args.jets) for j in jet_vars]
         df_X = pd.DataFrame(data = _X, columns=col_X)
         if len(test_torch_batch) > 2:
-            df_X['eventNumber']=spec
+            if not args.train:
+                df_X['eventNumber']=spec[:,0]
+                df_X['passClean']=spec[:,1]
+            else:
+                df_X['eventNumber']=spec
 
         col_P = ['from_top_'+str(j) for j in range(7)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
         df_P = pd.DataFrame(data = _P, columns=col_P)
