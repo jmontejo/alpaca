@@ -94,6 +94,11 @@ class BatchManagerTtbarChiara(BatchManager):
 
         # The input rows have all jet px, all jet py, ... all jet partonindex
         # So segment and swap axes to group by jet
+        event_number = df['eventNumber'][0]
+        print('event_number.shape')
+        print(event_number.shape)
+        print(event_number.head())
+        df = df[[c for c in df.columns if 'eventNumber' not in c]]
         jet_stack = np.swapaxes(df.values.reshape(len(df), 5, 10), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
 
@@ -164,11 +169,13 @@ class BatchManagerTtbarChiara(BatchManager):
             return (r[:njets].sum() == 6) and \
                    (r[njets:njets+5].sum() == 2) and \
                    (r[njets+5:].sum() == 2)
-        jets_clean = np.array([r for r, t in zip(jets, jetlabels)
-                               if good_labels(t,all_partons_included)])
-        jetlabels_clean = np.array([r for r in jetlabels if good_labels(r,all_partons_included)])
 
-        return jets_clean,None,None, jetlabels_clean
+        select_clean = np.array([good_labels(r,all_partons_included) for r in jetlabels])
+        jets_clean = jets[select_clean]
+        jetlabels_clean = jetlabels[select_clean]
+        event_number_clean = event_number[select_clean]
+
+        return jets_clean,None,None, jetlabels_clean, event_number_clean
 
  
 

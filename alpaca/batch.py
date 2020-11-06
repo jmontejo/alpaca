@@ -22,12 +22,13 @@ class BatchManager:
         tmp_extras = []
         tmp_scalars = []
         tmp_labels = []
+        tmp_spectators = []
 
         for input_path, category in zip_longest(args.input_files, args.input_categories):
             df = pd.read_hdf(input_path, dfname)
             df[self.internal_category_name] = category
 
-            jets, extras, scalars, labels = self.get_objects(
+            jets, extras, scalars, labels, spectators = self.get_objects(
                 df, args,
                 **kwargs
             )
@@ -36,11 +37,13 @@ class BatchManager:
             if extras is not None: tmp_extras.append(extras)
             if scalars is not None: tmp_scalars.append(scalars)
             tmp_labels.append(labels)
+            if spectators is not None: tmp_spectators.append(spectators)
 
         jets = np.concatenate(tmp_jets) if tmp_jets else None
         extras = np.concatenate(tmp_extras) if tmp_extras else None
         scalars = np.concatenate(tmp_scalars) if tmp_scalars else None
         labels = np.concatenate(tmp_labels)
+        spectators = np.concatenate(tmp_spectators) if tmp_spectators else None
 
         if args.shuffle_jets and jets:
             # shuffle only does the outermost level
@@ -54,23 +57,26 @@ class BatchManager:
             if jets is not None: jets    = jets[p]
             if extras is not None: extras  = extras[p]
             if scalars is not None: scalars = scalars[p]
+            if spectators is not None: spectators = spectators[p]
 
         self._jets    = jets
         self._extras  = extras
         self._scalars = scalars
         self._labels  = labels
+        self._spectators = spectators
 
         self.build_flat_arrays()
 
     @staticmethod
     def get_objects(df, args, **kwargs):
         ''' Returns a tuple of np.ndarray with the format:
-            - jets, extras, scalars, labels
+            - jets, extras, scalars, labels, spectators
             - jets.shape: (nevents, njets, jetcomponents), jetcomponents is the 4-vector plus possible extra information such as b-tagging score
             - extras.shape: (nevents, nextras, extrascomponents), same as jets but for other objects such as leptons.
                                                                   The extra fields for jets have to appear also in the extras, possibly 0-padded
             - scalars.shape: (nevents, nscalars). Set of event variables such as n_jet, n_bjet, HT, ...
             - labels.shape: (nevents, labelarray) array of target labels. Even if the label is 1-dimensional it still needs to have a shape of (nevents, 1)
+            - spectators.shape: (nevents, nspectators). Spectator variables for each event, assumed to be scalar
             - Some of jets/extras/scalars can be None but at least one has to be filled
         '''
         raise NotImplementedError('Please implement get_objects in your BatchManager','See get_objects in batch.py for documentation')
@@ -117,7 +123,10 @@ class BatchManager:
 
         X = torch.as_tensor(self._flatarrays[start_index:stop_index, :], dtype=torch.float)
         Y = torch.as_tensor(self._labels[start_index:stop_index, :], dtype=torch.float)
-        return X, Y
+        if self._spectators is not None:
+            return X, Y, self._spectators[start_index:stop_index]
+        else:
+            return X, Y
 
     def build_flat_arrays(self):
 

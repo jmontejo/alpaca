@@ -22,7 +22,7 @@ class BaseMain:
 
     def __init__(self, args):
         self.args = args
-        self.test_sample = 100000
+        self.test_sample = 500
         from itertools import accumulate
         self.boundaries = list(accumulate([0]+args.outputs))
         self.losses = {cat:[] for cat in ['total']+args.categories}
@@ -65,7 +65,8 @@ class BaseMain:
             model.train()
             opt.zero_grad()
 
-            X, Y = self.train_bm.get_torch_batch(batch_size, start_index=i * batch_size + self.test_sample)
+            train_torch_batch = self.train_bm.get_torch_batch(batch_size, start_index=i * batch_size + self.test_sample)
+            X, Y = train_torch_batch[0], train_torch_batch[1]            
             P = model(X)
             Y = Y.reshape(-1, args.totaloutputs)
 
@@ -94,7 +95,9 @@ class BaseMain:
 
         # Run for performance
         for bm in [self.train_bm] + self.test_bm:
-            X,Y = bm.get_torch_batch(self.test_sample)
+            test_torch_batch = bm.get_torch_batch(self.test_sample)
+            X,Y = test_torch_batch[0], test_torch_batch[1]
+            if len(test_torch_batch) > 2: spec = test_torch_batch[2]
             P  = model(X)
             _P = P.data.numpy()
             _Y = Y.data.numpy()
@@ -115,6 +118,8 @@ class BaseMain:
         jet_vars = ['jet_px','jet_py','jet_pz','jet_e']
         col_X = [j+'_'+str(i) for i in range(self.args.jets) for j in jet_vars]
         df_X = pd.DataFrame(data = _X, columns=col_X)
+        if len(test_torch_batch) > 2:
+            df_X['eventNumber']=spec
 
         col_P = ['from_top_'+str(j) for j in range(7)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
         df_P = pd.DataFrame(data = _P, columns=col_P)
