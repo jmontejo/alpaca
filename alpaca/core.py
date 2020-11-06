@@ -1,4 +1,5 @@
 import logging
+import os
 
 import torch
 from alpaca.batch import BatchManager
@@ -43,6 +44,7 @@ class BaseMain:
         args = self.args
         output_dir = self.get_output_dir()
         output_dir.mkdir(parents=True, exist_ok=True)
+        param_file = output_dir / 'NN.pt'
 
         alpaca.log.setup_logger(file_path=output_dir / 'alpaca.log')
         log.debug('Alpaca has been started and can finally log')
@@ -50,48 +52,55 @@ class BaseMain:
 
         log.info('Nr. of events: %s', self.train_bm.get_nr_events())
 
-        model = self.get_model(args)
+        if args.train:
 
-        opt = torch.optim.Adam(model.parameters())
+            model = self.get_model(args)
+            opt = torch.optim.Adam(model.parameters())
+            self.train_bm.is_consistent(args)
+            log.debug('BatchManager contents is consistent')
 
-        self.train_bm.is_consistent(args)
-        log.debug('BatchManager contents is consistent')
+            nr_train = floor(sqrt(self.train_bm.get_nr_events()-self.test_sample))
+            if args.fast: nr_train = int(sqrt(nr_train))
+            batch_size = nr_train
+            log.info('Training: %s iterations - batch size %s', nr_train, batch_size)
+            for i in progressbar(range(nr_train)):
+                model.train()
+                opt.zero_grad()
+                
+                train_torch_batch = self.train_bm.get_torch_batch(batch_size, start_index=i * batch_size + self.test_sample)
+                X, Y = train_torch_batch[0], train_torch_batch[1]            
+                P = model(X)
+                Y = Y.reshape(-1, args.totaloutputs)
+                
+                loss = {'total':0}
+                for i,cat in enumerate(args.categories):
+                    Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
+                    Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
+                    loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi)
+                    loss['total'] += loss[cat]
 
-        nr_train = floor(sqrt(self.train_bm.get_nr_events()-self.test_sample))
-        if args.fast: nr_train = int(sqrt(nr_train))
-        batch_size = nr_train
-        log.info('Training: %s iterations - batch size %s', nr_train, batch_size)
-        for i in progressbar(range(nr_train)):
-            model.train()
-            opt.zero_grad()
+                for key, val in loss.items():
+                    self.losses[key].append(float(val))
+                loss["total"].backward()
+                opt.step()
+            log.debug('Finished training')
+            torch.save(model, param_file )
 
-            train_torch_batch = self.train_bm.get_torch_batch(batch_size, start_index=i * batch_size + self.test_sample)
-            X, Y = train_torch_batch[0], train_torch_batch[1]            
-            P = model(X)
-            Y = Y.reshape(-1, args.totaloutputs)
+            fig = plt.figure()
+            for losstype, lossvals in self.losses.items():
+                plt.plot(lossvals, label=losstype)
+            plt.legend()
+            plt.savefig(str(output_dir / 'losses.png'))
+            plt.close()
 
-            loss = {'total':0}
-            for i,cat in enumerate(args.categories):
-                Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
-                Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
-                loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi)
-                loss['total'] += loss[cat]
-
-            for key, val in loss.items():
-                self.losses[key].append(float(val))
-            loss["total"].backward()
-            opt.step()
-        log.debug('Finished training')
+        else:
+            if os.path.exists(param_file):
+                model = torch.load(param_file)
+            else:
+                log.error("Running without training but the model file {} is not present".format(param_file))
 
     #def plots(self): ## should store the NN and then do the plotting as a separate step
         output_dir = self.get_output_dir()
-
-        fig = plt.figure()
-        for losstype, lossvals in self.losses.items():
-            plt.plot(lossvals, label=losstype)
-        plt.legend()
-        plt.savefig(str(output_dir / 'losses.png'))
-        plt.close()
 
         # Run for performance
         for bm in [self.train_bm] + self.test_bm:

@@ -41,6 +41,7 @@ def cli():
 
     parser = argparse.ArgumentParser(description='ML top-like tagger.')
     sharedparser.add_argument('--debug', action='store_true', help='Debug verbosity')
+    sharedparser.add_argument('--train', '-t', action='store_true', help='Run training')
     sharedparser.add_argument('--output-dir', type=Path, default=Path('data'),
                         help='path to the output directory')
     sharedparser.add_argument('--tag', default='alpaca',
