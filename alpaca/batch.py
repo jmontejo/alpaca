@@ -68,6 +68,13 @@ class BatchManager:
         self.build_flat_arrays()
 
     @staticmethod
+    def write_output(torch_batch, P):
+        ''' Writes the result into a file 
+            Takes as input the return value of get_torch_batch and P = model(X)
+        '''
+        raise NotImplementedError('Please implement write_output in your BatchManager','See write_output in batch.py for documentation')
+
+    @staticmethod
     def get_objects(df, args, **kwargs):
         ''' Returns a tuple of np.ndarray with the format:
             - jets, extras, scalars, labels, spectators

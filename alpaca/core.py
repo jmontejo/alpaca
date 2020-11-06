@@ -123,26 +123,8 @@ class BaseMain:
         print(_P.shape)
         
         # chiara: ugly and hardcoded, just to test
-        _X = X.data.numpy()
-        jet_vars = ['jet_px','jet_py','jet_pz','jet_e']
-        col_X = [j+'_'+str(i) for i in range(self.args.jets) for j in jet_vars]
-        df_X = pd.DataFrame(data = _X, columns=col_X)
-        if len(test_torch_batch) > 2:
-            if not args.train:
-                df_X['eventNumber']=spec[:,0]
-                df_X['passClean']=spec[:,1]
-            else:
-                df_X['eventNumber']=spec
-
-        col_P = ['from_top_'+str(j) for j in range(7)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
-        df_P = pd.DataFrame(data = _P, columns=col_P)
-
-        col_Y = [p+'_true' for p in col_P]
-        df_Y = pd.DataFrame(data = _Y, columns=col_Y)
-
-        df_test = pd.concat([df_X, df_P, df_Y], axis=1, sort=False)
-        
-        df_test.to_csv('mytest.csv')
+        if args.write_output:
+            self.write_output(test_torch_batch, P)
 
         for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
             Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
@@ -166,3 +148,9 @@ class BaseMain:
                 plt.legend(loc="lower right")
                 plt.savefig(str(output_dir / 'roc_curve_{}_{}.png'.format(cat,ijet)))
                 plt.close()
+
+    def write_output(self, torch_batch, P):
+        ''' Writes the result into a file 
+            Takes as input the return value of get_torch_batch and P = model(X)
+        '''
+        raise NotImplementedError('Please implement write_output in your BatchManager','See write_output in batch.py for documentation')

@@ -40,6 +40,32 @@ class MainTtbarChiara(BaseMain):
     def plots(self):
         log.warning("No plots for MainTtbarChiara")
 
+    def write_output(self, torch_batch, P):
+        X,Y = torch_batch[0], torch_batch[1]
+        if len(torch_batch) > 2: spec = torch_batch[2]
+        _P = P.data.numpy()
+        _Y = Y.data.numpy()
+        _X = X.data.numpy()
+        jet_vars = ['jet_px','jet_py','jet_pz','jet_e']
+        col_X = [j+'_'+str(i) for i in range(self.args.jets) for j in jet_vars]
+        df_X = pd.DataFrame(data = _X, columns=col_X)
+        if len(torch_batch) > 2:
+            if not self.args.train:
+                df_X['eventNumber']=spec[:,0]
+                df_X['passClean']=spec[:,1]
+            else:
+                df_X['eventNumber']=spec
+
+        col_P = ['from_top_'+str(j) for j in range(7)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
+        df_P = pd.DataFrame(data = _P, columns=col_P)
+
+        col_Y = [p+'_true' for p in col_P]
+        df_Y = pd.DataFrame(data = _Y, columns=col_Y)
+
+        df_test = pd.concat([df_X, df_P, df_Y], axis=1, sort=False)
+        
+        df_test.to_csv('mytest.csv')
+
 
 class BatchManagerTtbarChiara(BatchManager):
 
