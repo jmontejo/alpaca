@@ -72,16 +72,14 @@ class BatchManagerTtbarChiara(BatchManager):
     @staticmethod
     def get_objects(df, args, **kwargs):
 
-        print('df.shape')
-        print(df.shape)
-        # chiara: dirty! remove category
+        # remove category -- note: look for better way of doing this
         columns_keep = [c for c in df.columns if 'alpaca' not in c[0]]
         df=df[columns_keep]
-        #print(df.columns)
         
         jets_per_event = args.jets
         zero_jets = args.zero_jets
-        # chiara: find how to pass these
+
+        # FIXME: pass these as arguments
         all_partons_included=True
         qcd_like=False
 
@@ -121,9 +119,6 @@ class BatchManagerTtbarChiara(BatchManager):
         # The input rows have all jet px, all jet py, ... all jet partonindex
         # So segment and swap axes to group by jet
         event_number = df['eventNumber'][0]
-        print('event_number.shape')
-        print(event_number.shape)
-        print(event_number.head())
         df = df[[c for c in df.columns if 'eventNumber' not in c]]
         jet_stack = np.swapaxes(df.values.reshape(len(df), 5, 10), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
@@ -139,9 +134,6 @@ class BatchManagerTtbarChiara(BatchManager):
         jet_stack[:, :, 3] = jet_e
 
         #jet_stack_pt = np.sqrt(jet_stack[:, :, 0]**2+jet_stack[:, :, 1]**2)
-        #print(jet_stack_pt.shape)
-        #print(np.ones(jet_stack[:, :,0].shape).shape)
-        #print(np.maximum(jet_stack_pt,np.ones(jet_stack[:, :,0].shape)))
         #jet_stack_eta = np.arcsinh(jet_stack[:, :, 2]/np.maximum(jet_stack_pt,np.ones(jet_stack[:, :,0].shape)))
         #jet_stack_phi = np.arctan(jet_stack[:, :, 1]/np.maximum(jet_stack[:, :, 0],np.ones(jet_stack[:, :,0].shape)))
         #jet_stack[:, :, 0] = jet_stack_pt

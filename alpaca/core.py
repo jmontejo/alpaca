@@ -111,18 +111,8 @@ class BaseMain:
             _P = P.data.numpy()
             _Y = Y.data.numpy()
             #FIXME, think about many bm plots
-            # chiara: the way it is it's just looking at the training sample right? 
-            
-        print('type(P)')
-        print(type(P))
-        print('type(_P)')
-        print(type(_P))
-        print('shape P')
-        print(P.shape)
-        print('shape _P')
-        print(_P.shape)
-        
-        # chiara: ugly and hardcoded, just to test
+                    
+        # Write results to file with analysis-specific function
         if args.write_output:
             self.write_output(test_torch_batch, P)
 
