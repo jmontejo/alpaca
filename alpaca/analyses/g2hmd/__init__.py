@@ -158,5 +158,5 @@ class BatchManager2HDM(BatchManager):
         if args.jets == 0:
             jets_clean = None
 
-        return jets_clean, lep_met_clean, scalars_clean, labels_clean
+        return jets_clean, lep_met_clean, scalars_clean, labels_clean, None
 
