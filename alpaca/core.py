@@ -23,7 +23,6 @@ class BaseMain:
 
     def __init__(self, args):
         self.args = args
-        self.test_sample = 500
         from itertools import accumulate
         self.boundaries = list(accumulate([0]+args.outputs))
         self.losses = {cat:[] for cat in ['total']+args.categories}
@@ -42,6 +41,7 @@ class BaseMain:
 
     def run(self):
         args = self.args
+        test_sample = args.test_sample if args.test_sample >= 0 else self.train_bm.get_nr_events()
         output_dir = self.get_output_dir()
         output_dir.mkdir(parents=True, exist_ok=True)
         param_file = output_dir / 'NN.pt'
@@ -59,7 +59,7 @@ class BaseMain:
             self.train_bm.is_consistent(args)
             log.debug('BatchManager contents is consistent')
 
-            nr_train = floor(sqrt(self.train_bm.get_nr_events()-self.test_sample))
+            nr_train = floor(sqrt(self.train_bm.get_nr_events()-test_sample))
             if args.fast: nr_train = int(sqrt(nr_train))
             batch_size = nr_train
             log.info('Training: %s iterations - batch size %s', nr_train, batch_size)
@@ -67,7 +67,7 @@ class BaseMain:
                 model.train()
                 opt.zero_grad()
                 
-                train_torch_batch = self.train_bm.get_torch_batch(batch_size, start_index=i * batch_size + self.test_sample)
+                train_torch_batch = self.train_bm.get_torch_batch(batch_size, start_index=i * batch_size + test_sample)
                 X, Y = train_torch_batch[0], train_torch_batch[1]            
                 P = model(X)
                 Y = Y.reshape(-1, args.totaloutputs)
@@ -104,7 +104,7 @@ class BaseMain:
 
         # Run for performance
         for bm in [self.train_bm] + self.test_bm:
-            test_torch_batch = bm.get_torch_batch(self.test_sample)
+            test_torch_batch = bm.get_torch_batch(test_sample)
             X,Y = test_torch_batch[0], test_torch_batch[1]
             if len(test_torch_batch) > 2: spec = test_torch_batch[2]
             P  = model(X)
