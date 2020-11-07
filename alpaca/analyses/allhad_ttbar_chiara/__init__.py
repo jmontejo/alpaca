@@ -62,7 +62,9 @@ class MainTtbarChiara(BaseMain):
             df_Y = pd.DataFrame(data = _Y, columns=col_Y)    
             df_test = pd.concat([df_X, df_P, df_Y], axis=1, sort=False)
         
-        df_test.to_csv('mytest.csv')
+        output_dir = self.get_output_dir() 
+        output_name = output_dir / ('NNoutput_'+self.args.label_roc+'.csv')
+        df_test.to_csv(output_name)
 
 
 class BatchManagerTtbarChiara(BatchManager):
@@ -125,7 +127,10 @@ class BatchManagerTtbarChiara(BatchManager):
         # So segment and swap axes to group by jet
         event_number = df['eventNumber'][0]
         df = df[[c for c in df.columns if 'eventNumber' not in c]]
-        jet_stack = np.swapaxes(df.values.reshape(len(df), 5, 10), 1, 2)
+        if args.no_truth:
+            jet_stack = np.swapaxes(df.values.reshape(len(df), 4, 10), 1, 2)
+        else:
+            jet_stack = np.swapaxes(df.values.reshape(len(df), 5, 10), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
 
         #Reverse to intuitive order

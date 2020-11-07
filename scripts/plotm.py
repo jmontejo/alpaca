@@ -10,7 +10,7 @@ filename_chi2 = '/Users/crizzi/lavoro/SUSY/RPV/alpaca_mio/alpaca_example_files/A
 tname_chi2 = 'nominal'
 f_chi2 = uproot.open(filename_chi2)
 t_chi2 = f_chi2[tname_chi2]
-#print(t_chi2.show())
+print(t_chi2.GetEntries())
 df_chi2 = t_chi2.pandas.df(['eventNumber', 'reco_Chi2Fitted', 'reco_t1_m', 'reco_t2_m', 'jet_pt*'], flatten=False)
 df_chi2['njets'] = df_chi2['jet_pt'].apply(lambda x: len(x))
 df_chi2['njets_25'] = df_chi2['jet_pt'].apply(lambda x: len([j for j in x if j > 25000]))
