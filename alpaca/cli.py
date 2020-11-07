@@ -65,6 +65,7 @@ def cli():
     sharedparser.add_argument('--shuffle-jets', action='store_true')
     sharedparser.add_argument('--fast', action='store_true',help="Run only over sqrt(N) events for a fast test")
     sharedparser.add_argument('--test-sample', type=int, default=-1, help="How many events to use for the test sample. If running the training, the training sample is all the remaining events. If negative, use the whole sample")
+    sharedparser.add_argument('--label-roc', type=str, default="", help="Label added to the name of the ROC curve plots")
 
 
     nnchoice = sharedparser.add_mutually_exclusive_group()

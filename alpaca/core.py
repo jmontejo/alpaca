@@ -136,7 +136,7 @@ class BaseMain:
                 plt.ylabel('True Positive Rate')
                 #plt.title('Receiver operating characteristic')
                 plt.legend(loc="lower right")
-                plt.savefig(str(output_dir / 'roc_curve_{}_{}.png'.format(cat,ijet)))
+                plt.savefig(str(output_dir / 'roc_curve{}_{}_{}.png'.format((len(args.label_roc)>0)*'_'+args.label_roc,cat,ijet)))
                 plt.close()
 
     def write_output(self, torch_batch, P):
