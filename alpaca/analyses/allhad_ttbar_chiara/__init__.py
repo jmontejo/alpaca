@@ -50,19 +50,17 @@ class MainTtbarChiara(BaseMain):
         col_X = [j+'_'+str(i) for i in range(self.args.jets) for j in jet_vars]
         df_X = pd.DataFrame(data = _X, columns=col_X)
         if len(torch_batch) > 2:
-            if not self.args.train:
-                df_X['eventNumber']=spec[:,0]
-                df_X['passClean']=spec[:,1]
-            else:
-                df_X['eventNumber']=spec
+            df_X['eventNumber']=spec
 
         col_P = ['from_top_'+str(j) for j in range(7)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
         df_P = pd.DataFrame(data = _P, columns=col_P)
 
-        col_Y = [p+'_true' for p in col_P]
-        df_Y = pd.DataFrame(data = _Y, columns=col_Y)
-
-        df_test = pd.concat([df_X, df_P, df_Y], axis=1, sort=False)
+        if self.args.no_truth:
+            df_test = pd.concat([df_X, df_P], axis=1, sort=False)
+        else:
+            col_Y = [p+'_true' for p in col_P]
+            df_Y = pd.DataFrame(data = _Y, columns=col_Y)    
+            df_test = pd.concat([df_X, df_P, df_Y], axis=1, sort=False)
         
         df_test.to_csv('mytest.csv')
 
@@ -75,15 +73,20 @@ class BatchManagerTtbarChiara(BatchManager):
         # remove category -- note: look for better way of doing this
         columns_keep = [c for c in df.columns if 'alpaca' not in c[0]]
         df=df[columns_keep]
-        
+
+        # print('input df shape', df.shape)
+
         jets_per_event = args.jets
         zero_jets = args.zero_jets
+        use_truth = not args.no_truth
+        # when training I need to have and use truth label 
+        if args.train: use_truth=True
 
         # FIXME: pass these as arguments
         all_partons_included=True
         qcd_like=False
 
-        tot_jets_per_event = len(df['partonindex'].columns.get_level_values('subentry'))
+        tot_jets_per_event = len(df['jet_e'].columns.get_level_values('subentry'))
 
         if (jets_per_event - zero_jets) > tot_jets_per_event:
             log.warning(
@@ -97,24 +100,26 @@ class BatchManagerTtbarChiara(BatchManager):
         #    remaining jets after the Nth there aren't any (note the minus sign)
         # - the leading jets are all existent
         #leadingNincludealltop = - df[[("partonindex", i) for i in range(jets_per_event, tot_jets_per_event)]].any(axis=1) #not "- zero_jets" this would make the last jet always ISR
-        if qcd_like:
-            leadingNincludealltop = (df[[("partonindex", i) for i in range(jets_per_event)]]>0).sum(1) <=2
-        else:
-            leadingNincludealltop = (df[[("partonindex", i) for i in range(jets_per_event)]]>0).sum(1) ==6
+        if use_truth:
+            if qcd_like:
+                leadingNincludealltop = (df[[("partonindex", i) for i in range(jets_per_event)]]>0).sum(1) <=2
+            else:
+                leadingNincludealltop = (df[[("partonindex", i) for i in range(jets_per_event)]]>0).sum(1) ==6
+            # print('leadingNincludealltop',leadingNincludealltop.sum())
 
-        leadingNarenonzero = df[[("jet_e", i) for i in range(jets_per_event - zero_jets)]].all(axis=1)
-
+            leadingNarenonzero = df[[("jet_e", i) for i in range(jets_per_event - zero_jets)]].all(axis=1)
         #exactlyleadingNarenonzero = - df[[("jet_e", i) for i in range(jets_per_event, tot_jets_per_event)]].any(axis=1) #not "- zero_jets" this would make the last jet always ISR
         #if all_partons_included:
         #    df = df[leadingNincludealltop & leadingNarenonzero & exactlyleadingNarenonzero]
         #else:
         #    df = df[leadingNarenonzero & exactlyleadingNarenonzero]
 
-        if all_partons_included:
-            df = df[leadingNincludealltop & leadingNarenonzero]
-        else:
-            df = df[leadingNarenonzero]
+            # print('leadingNarenonzero',leadingNarenonzero.sum())
 
+            if all_partons_included:
+                df = df[leadingNincludealltop & leadingNarenonzero]
+            else:
+                df = df[leadingNarenonzero]
 
         # The input rows have all jet px, all jet py, ... all jet partonindex
         # So segment and swap axes to group by jet
@@ -148,55 +153,60 @@ class BatchManagerTtbarChiara(BatchManager):
         # which removes some events.
 
         jets = labeledjets[:, :, :4]
-        labels = np.array(labeledjets[:, :, -1:].squeeze(), dtype=int)
+        print('jets  shape:',jets.shape)
+        if use_truth:
+            labels = np.array(labeledjets[:, :, -1:].squeeze(), dtype=int) # partonindex
+            #if all_partons_included==False:
+            #    self._jets = jets
+            #    self._jetlabels = np.zeros((len(jets),jets_per_event+11))
+            #    return
 
-        #if all_partons_included==False:
-        #    self._jets = jets
-        #    self._jetlabels = np.zeros((len(jets),jets_per_event+11))
-        #    return
-
-        # Convert the parton labels to bools that the network can make sense of
-        # is the jet from the ttbar system?
-        jetfromttbar = labels > 0
-        # is the jet associated with the top quark?
-        # Disregard the jets that are from ISR
-        # Account for charge ambiguity by identifying whether the
-        # jets match the leading jet or not
-        maskedlabels = np.ma.masked_where(jetfromttbar == False, labels)
-        nonisrlabels = np.array([r.compressed() for r in maskedlabels])
-        topmatch = np.array([r > 3 if r[0] > 3 else r <= 3 for r in nonisrlabels])
-        isbjet = np.array([np.equal(r, 1) | np.equal(r, 4) for r in nonisrlabels])
-        jetlabels = np.concatenate([jetfromttbar, topmatch[:, 1:], isbjet], 1)
-        # Substitute this line for the preceding if only doing the 6 top jets
-        # Not currently configurable by command line because it's a bit more
-        # complicated overall + less often changed
-        # topmatch = np.array( [ r>3 if r[0]>3 else r<3 for r in labels] )
-        # isbjet = np.array( [ np.equal(r,1) | np.equal(r,4) for r in labels] )
-        # jetlabels = np.concatenate([jetfromttbar.squeeze(),topmatch[:,1:],isbjet],1)
+            # Convert the parton labels to bools that the network can make sense of
+            # is the jet from the ttbar system?
+            jetfromttbar = labels > 0
+            # is the jet associated with the top quark?
+            # Disregard the jets that are from ISR
+            # Account for charge ambiguity by identifying whether the
+            # jets match the leading jet or not
+            maskedlabels = np.ma.masked_where(jetfromttbar == False, labels)
+            nonisrlabels = np.array([r.compressed() for r in maskedlabels])
+            topmatch = np.array([r > 3 if r[0] > 3 else r <= 3 for r in nonisrlabels])
+            isbjet = np.array([np.equal(r, 1) | np.equal(r, 4) for r in nonisrlabels])
+            jetlabels = np.concatenate([jetfromttbar, topmatch[:, 1:], isbjet], 1)
+            # Substitute this line for the preceding if only doing the 6 top jets
+            # Not currently configurable by command line because it's a bit more
+            # complicated overall + less often changed
+            # topmatch = np.array( [ r>3 if r[0]>3 else r<3 for r in labels] )
+            # isbjet = np.array( [ np.equal(r,1) | np.equal(r,4) for r in labels] )
+            # jetlabels = np.concatenate([jetfromttbar.squeeze(),topmatch[:,1:],isbjet],1)
 
 
-        # Check that the encoded events have the expected number of positive
-        # labels. This cleanup is a consequence of the truth matching script
-        # that created the input, so this next bit makes sure that the labels
-        # conform to the expectations we have for training, 6 top jets, 2 more
-        # to complete top1 and 2 b-jets.
-        def good_labels(r,all_partons_included):
-            if not all_partons_included: return True
-            if qcd_like: return True
-            
-            njets = labeledjets.shape[1]
-            return (r[:njets].sum() == 6) and \
-                (r[njets:njets+5].sum() == 2) and \
-                (r[njets+5:].sum() == 2)
-        
-        select_clean = np.array([good_labels(r,all_partons_included) for r in jetlabels])
+            # Check that the encoded events have the expected number of positive
+            # labels. This cleanup is a consequence of the truth matching script
+            # that created the input, so this next bit makes sure that the labels
+            # conform to the expectations we have for training, 6 top jets, 2 more
+            # to complete top1 and 2 b-jets.
+            def good_labels(r,all_partons_included):
+                if not all_partons_included: return True
+                if qcd_like: return True
+                
+                njets = labeledjets.shape[1]
+                return (r[:njets].sum() == 6) and \
+                    (r[njets:njets+5].sum() == 2) and \
+                    (r[njets+5:].sum() == 2)
 
-        if args.train:
+            select_clean = np.array([good_labels(r,all_partons_included) for r in jetlabels])
+            # print('clean shape:',jets[select_clean].shape)
+            # print('leadingNincludealltop', leadingNincludealltop.shape)
+            # print('select_clean',select_clean.shape)
+
             jets_clean = jets[select_clean]
             jetlabels_clean = jetlabels[select_clean]
             event_number_clean = event_number[select_clean]
             return jets_clean,None,None, jetlabels_clean, event_number_clean
+
         else:
-            return jets,None,None, jetlabels, np.vstack((event_number,select_clean)).T
+            jetlabels = np.zeros((jets.shape[0], 1))
+            return jets,None,None, jetlabels, event_number
  
 

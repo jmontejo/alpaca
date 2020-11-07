@@ -116,28 +116,29 @@ class BaseMain:
         if args.write_output:
             self.write_output(test_torch_batch, P)
 
-        for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
-            Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
-            Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
+        if not args.no_truth: # Only for samples for which I have truth inf
+            for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
+                Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
+                Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
 
-            for ijet in range(jets):
+                for ijet in range(jets):
 
-                log.info('Plot ROC curve, category %s and output num %d'%(cat,ijet))
-                fpr, tpr, thr = roc_curve(Yi[:,ijet], Pi[:,ijet])
-                roc_auc = auc(fpr, tpr)
-
-                fig = plt.figure()
-                plt.plot(fpr, tpr, color='darkorange',
-                         label='ROC curve (area = {:.2f})'.format(roc_auc))
-                plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-                plt.xlim([0.0, 1.0])
-                plt.ylim([0.0, 1.05])
-                plt.xlabel('False Positive Rate')
-                plt.ylabel('True Positive Rate')
+                    log.info('Plot ROC curve, category %s and output num %d'%(cat,ijet))
+                    fpr, tpr, thr = roc_curve(Yi[:,ijet], Pi[:,ijet])
+                    roc_auc = auc(fpr, tpr)
+                    
+                    fig = plt.figure()
+                    plt.plot(fpr, tpr, color='darkorange',
+                             label='ROC curve (area = {:.2f})'.format(roc_auc))
+                    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+                    plt.xlim([0.0, 1.0])
+                    plt.ylim([0.0, 1.05])
+                    plt.xlabel('False Positive Rate')
+                    plt.ylabel('True Positive Rate')
                 #plt.title('Receiver operating characteristic')
-                plt.legend(loc="lower right")
-                plt.savefig(str(output_dir / 'roc_curve{}_{}_{}.png'.format((len(args.label_roc)>0)*'_'+args.label_roc,cat,ijet)))
-                plt.close()
+                    plt.legend(loc="lower right")
+                    plt.savefig(str(output_dir / 'roc_curve{}_{}_{}.png'.format((len(args.label_roc)>0)*'_'+args.label_roc,cat,ijet)))
+                    plt.close()
 
     def write_output(self, torch_batch, P):
         ''' Writes the result into a file 
