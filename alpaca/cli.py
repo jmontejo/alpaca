@@ -50,6 +50,7 @@ def cli():
     sharedparser.add_argument('--jets', help='Number of jets to be used', type=int)
     sharedparser.add_argument('--zero-jets', help='Number of jet positions that can be left empty', type=int)
     sharedparser.add_argument('--extra-jet-fields', help='Additional information to be included with the jets', action=UniqueAppend, default=[])
+    sharedparser.add_argument('--spectators', help='List of spectator variables with the same name as in the input df', action=UniqueAppend, default=[])
     sharedparser.add_argument('--extras', help='Number of extra objects to be used', type=int, default=0)
     sharedparser.add_argument('--outputs', help='Number of output flags. Comma-separated list with length equal to the number of categories. \
                                            Can use "N" to read the number of jets. E.g. "N,5,6"')
