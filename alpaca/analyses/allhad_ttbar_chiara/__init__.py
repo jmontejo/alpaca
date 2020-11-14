@@ -49,12 +49,9 @@ class MainTtbarChiara(BaseMain):
         jet_vars = ['jet_px','jet_py','jet_pz','jet_e']
         col_X = [j+'_'+str(i) for i in range(self.args.jets) for j in jet_vars]
         df_X = pd.DataFrame(data = _X, columns=col_X)
-        print(len(torch_batch))
         if len(torch_batch) > 2:
             for i,s in enumerate(self.args.spectators):
                 df_X[s]=spec[:,i]
-        print(spec.shape)
-        print(df_X.head())
         col_P = ['from_top_'+str(j) for j in range(7)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
         df_P = pd.DataFrame(data = _P, columns=col_P)
 
@@ -130,10 +127,8 @@ class BatchManagerTtbarChiara(BatchManager):
         # So segment and swap axes to group by jet
         spectators = []
         for s in args.spectators:            
-            spectators.append(df[c][0]) 
+            spectators.append(df[s][0]) 
         df = df[[c for c in df.columns if c[0] not in args.spectators]]
-        for c in df.columns:
-            print(c, 'is in spectators?', c[0] in args.spectators)
         if args.no_truth:
             jet_stack = np.swapaxes(df.values.reshape(len(df), 4, 10), 1, 2)
         else:
@@ -165,7 +160,7 @@ class BatchManagerTtbarChiara(BatchManager):
         # which removes some events.
 
         jets = labeledjets[:, :, :4]
-        print('jets  shape:',jets.shape)
+        # print('jets  shape:',jets.shape)
         if use_truth:
             labels = np.array(labeledjets[:, :, -1:].squeeze(), dtype=int) # partonindex
             #if all_partons_included==False:
@@ -216,13 +211,13 @@ class BatchManagerTtbarChiara(BatchManager):
             jetlabels_clean = jetlabels[select_clean]
             spectators_clean = []
             for s in spectators:
-                spectators_clean.append(s[select_clean])
-            spectators_formatted_clean = np.vstack(spectators_clean).T
+                spectators_clean.append(s[select_clean])            
+            spectators_formatted_clean = np.vstack(spectators_clean).T if(len(args.spectators)>0) else None
             return jets_clean,None,None, jetlabels_clean, spectators_formatted_clean
 
         else:
             jetlabels = np.zeros((jets.shape[0], 1))
-            spectators_formatted = np.vstack(spectators).T
+            spectators_formatted = np.vstack(spectators).T if(len(args.spectators)>0) else None
             return jets,None,None, jetlabels, spectators_formatted
  
 
