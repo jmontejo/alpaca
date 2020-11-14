@@ -35,6 +35,10 @@ class BaseMain:
         if args.simple_nn:
             from alpaca.nn.simple import SimpleNN
             return SimpleNN((self.args.jets+self.args.extras)*(4+self.args.nextrafields) + self.args.nscalars, self.args.totaloutputs, fflayers=[200])
+        elif args.hydra:
+            from alpaca.nn.hydra import Hydra
+            log.info('  FeedForwardHead intermediate layers')            
+            return Hydra(self.args.jets+self.args.extras, 30, fflayers=[200],nscalars=self.args.nscalars, nextrafields=self.args.nextrafields)
         else: #ColaLola is default
             from alpaca.nn.colalola import CoLaLoLa
             return CoLaLoLa(self.args.jets+self.args.extras, 30, self.args.totaloutputs, nscalars=self.args.nscalars,nextrafields=self.args.nextrafields,fflayers=[200])
@@ -101,7 +105,6 @@ class BaseMain:
 
     #def plots(self): ## should store the NN and then do the plotting as a separate step
         output_dir = self.get_output_dir()
-
         # Run for performance
         for bm in [self.train_bm] + self.test_bm:
             test_torch_batch = bm.get_torch_batch(test_sample)

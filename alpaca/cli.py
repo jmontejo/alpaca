@@ -72,6 +72,7 @@ def cli():
     nnchoice = sharedparser.add_mutually_exclusive_group()
     nnchoice.add_argument("--simple-nn",action="store_true")
     nnchoice.add_argument("--cola-lola",action="store_true")
+    nnchoice.add_argument('--hydra', action='store_true')
 
     subparser = parser.add_subparsers(title='analyses commands', dest='subparser')
 
