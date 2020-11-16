@@ -54,15 +54,26 @@ class DecayHead(torch.nn.Module):
 # Technically now the components are no longer just separate heads... oops
 class Hydra(torch.nn.Module):
 
-    def __init__(self, njets, ncombos, fflayers=[200]):
+    def __init__(self, njets, ncombos, fflayers=[200], nscalars=0, nextrafields=0):
         super(Hydra, self).__init__()
         self.njets = njets
         self.ncombos = ncombos
         self.fflayers = fflayers
         self.isr_head = IsrHead(self.njets,self.ncombos,self.fflayers)
         self.decay_head = DecayHead(self.njets, self.ncombos,self.fflayers)
+        self.nscalars = nscalars
+        self.nextrafields = nextrafields
 
     def forward(self,vectors):
+        if self.nscalars:
+            scalars = vectors[:,:self.nscalars]
+            vectors = vectors[:,self.nscalars:]            
+        try:
+            vectors = vectors.reshape(vectors.shape[0],self.njets,4+self.nextrafields)
+        except RuntimeError as e:
+            print("Hydra objects %d, jet components %d, scalars %d"%(self.njets,4+self.nextrafields,self.nscalars ))
+            raise e
+
         # Get the ISR tag result
         output_isr = self.isr_head(vectors)
 
