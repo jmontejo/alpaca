@@ -41,6 +41,8 @@ def cli():
 
     parser = argparse.ArgumentParser(description='ML top-like tagger.')
     sharedparser.add_argument('--debug', action='store_true', help='Debug verbosity')
+    sharedparser.add_argument('--train', '-t', action='store_true', help='Run training')
+    sharedparser.add_argument('--write-output', '-w', action='store_true', help='Stores the result of the evaluation on the test sample')
     sharedparser.add_argument('--output-dir', type=Path, default=Path('data'),
                         help='path to the output directory')
     sharedparser.add_argument('--tag', default='alpaca',
@@ -48,6 +50,7 @@ def cli():
     sharedparser.add_argument('--jets', help='Number of jets to be used', type=int)
     sharedparser.add_argument('--zero-jets', help='Number of jet positions that can be left empty', type=int)
     sharedparser.add_argument('--extra-jet-fields', help='Additional information to be included with the jets', action=UniqueAppend, default=[])
+    sharedparser.add_argument('--spectators', help='List of spectator variables with the same name as in the input df', action=UniqueAppend, default=[])
     sharedparser.add_argument('--extras', help='Number of extra objects to be used', type=int, default=0)
     sharedparser.add_argument('--outputs', help='Number of output flags. Comma-separated list with length equal to the number of categories. \
                                            Can use "N" to read the number of jets. E.g. "N,5,6"')
@@ -62,10 +65,14 @@ def cli():
     sharedparser.add_argument('--shuffle-events', action='store_true')
     sharedparser.add_argument('--shuffle-jets', action='store_true')
     sharedparser.add_argument('--fast', action='store_true',help="Run only over sqrt(N) events for a fast test")
+    sharedparser.add_argument('--test-sample', type=int, default=-1, help="How many events to use for the test sample. If running the training, the training sample is all the remaining events. If negative, use the whole sample")
+    sharedparser.add_argument('--label-roc', type=str, default="", help="Label added to the name of the ROC curve plots")
+    sharedparser.add_argument('--no-truth', action='store_true')
 
     nnchoice = sharedparser.add_mutually_exclusive_group()
     nnchoice.add_argument("--simple-nn",action="store_true")
     nnchoice.add_argument("--cola-lola",action="store_true")
+    nnchoice.add_argument('--hydra', action='store_true')
 
     subparser = parser.add_subparsers(title='analyses commands', dest='subparser')
 

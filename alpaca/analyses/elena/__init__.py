@@ -118,4 +118,4 @@ class BatchManagerElena(BatchManager):
         jet_stack = np.swapaxes(jet_df.values.reshape(len(jet_df), len(jet_vars), maxjets), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
 
-        return jet_stack, None, None, event_stack
+        return jet_stack, None, None, event_stack, None
