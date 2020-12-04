@@ -68,6 +68,8 @@ def cli():
     sharedparser.add_argument('--test-sample', type=int, default=-1, help="How many events to use for the test sample. If running the training, the training sample is all the remaining events. If negative, use the whole sample")
     sharedparser.add_argument('--label-roc', type=str, default="", help="Label added to the name of the ROC curve plots")
     sharedparser.add_argument('--no-truth', action='store_true')
+    sharedparser.add_argument("--fflayers", nargs="+", type=int, default=[200])
+    sharedparser.add_argument("--ncombos", type=int, default=30)
 
     nnchoice = sharedparser.add_mutually_exclusive_group()
     nnchoice.add_argument("--simple-nn",action="store_true")

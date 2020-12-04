@@ -8,13 +8,6 @@ import progressbar
 import argparse
 
 
-col_truth = ['eventNumber','from_top_0_true',
-             'from_top_1_true', 'from_top_2_true', 'from_top_3_true',
-             'from_top_4_true', 'from_top_5_true', 'from_top_6_true',
-             'same_as_lead_0_true', 'same_as_lead_1_true', 'same_as_lead_2_true',
-             'same_as_lead_3_true', 'same_as_lead_4_true', 'is_b_0_true',
-             'is_b_1_true', 'is_b_2_true', 'is_b_3_true', 'is_b_4_true',
-             'is_b_5_true']
 
 def options():
     parser = argparse.ArgumentParser(usage=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -29,6 +22,7 @@ def options():
     parser.add_argument('--no-input-root',    action='store_true' ,       help="Do not add the information in the original ROOT file")
     parser.add_argument('--no-truth',    action='store_true' ,       help="Do not add the information in the alpaca file with truth info")
     parser.add_argument('--output',     default='outtree_nopTchoice.root',        help="Name of output ROOT file")
+    parser.add_argument('--jets', '-j',    default=7,        help="How many jets have been used to train alpaca? (atm max 10)", type=int)
     parser.add_argument('--weights',     default=[],  nargs='*',        help="Weights for output tree as in the csv file")
     return parser.parse_args()
 
@@ -74,6 +68,19 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
         print(df_chi2_bfixed.shape)
         print(df_chi2_bfixed.head())
 
+    col_truth = ['eventNumber','from_top_0_true',
+                 'from_top_1_true', 'from_top_2_true', 'from_top_3_true',
+                 'from_top_4_true', 'from_top_5_true', 'from_top_6_true',
+                 'same_as_lead_0_true', 'same_as_lead_1_true', 'same_as_lead_2_true',
+                 'same_as_lead_3_true', 'same_as_lead_4_true', 'is_b_0_true',
+                 'is_b_1_true', 'is_b_2_true', 'is_b_3_true', 'is_b_4_true',
+                 'is_b_5_true']
+    if args.jets > 7:
+        col_truth.append('from_top_7_true')
+    if args.jets > 8:
+        col_truth.append('from_top_8_true')
+    if args.jets > 9:
+        col_truth.append('from_top_9_true')
 
     if not args.no_truth:
         df_alpaca_truth=pd.read_csv(args.input_alpaca_truth)
@@ -166,8 +173,19 @@ def build_tree(args):
     njets = array('i',[0])
     njets_25 = array('i',[0])
     njets_55 = array('i',[0])
-    wei  = array('d',[0])
 
+    alpaca_good_mt1 = array('i',[0])
+    alpaca_good_mt2 = array('i',[0])
+    chi2_good_mt1 = array('i',[0])
+    chi2_good_mt2 = array('i',[0])
+
+    score_is_from_tt_1 = array('d',[0])
+    score_is_from_tt_2 = array('d',[0])
+    score_same_as_lead_1 = array('d',[0])
+    score_same_as_lead_2 = array('d',[0])
+    score_sum = array('d',[0])
+
+    wei  = array('d',[0])
 
     t_out.Branch("mt1_reco",  mt1_reco, "mt1_reco/D")
     t_out.Branch("mt2_reco",  mt2_reco, "mt2_reco/D")
@@ -191,6 +209,17 @@ def build_tree(args):
     t_out.Branch("pass_chi2_bfixed",  pass_reco_chi2_bfixed, "pass_chi2_bfixed/I")
     t_out.Branch("pass_anatop",  pass_anatop, "pass_anatop/I")
     
+    t_out.Branch("alpaca_good_mt1",  alpaca_good_mt1, "alpaca_good_mt1/I")
+    t_out.Branch("alpaca_good_mt2",  alpaca_good_mt2, "alpaca_good_mt2/I")
+    t_out.Branch("chi2_good_mt1",  chi2_good_mt1, "chi2_good_mt1/I")
+    t_out.Branch("chi2_good_mt2",  chi2_good_mt2, "chi2_good_mt2/I")
+
+    t_out.Branch("score_is_from_tt_1",  score_is_from_tt_1, "score_is_from_tt_1/D")
+    t_out.Branch("score_is_from_tt_2",  score_is_from_tt_2, "score_is_from_tt_2/D")
+    t_out.Branch("score_same_as_lead_1",  score_same_as_lead_1, "score_same_as_lead_1/D")
+    t_out.Branch("score_same_as_lead_2",  score_same_as_lead_2, "score_same_as_lead_2/D")
+    t_out.Branch("score_sum",  score_sum, "score_sum/D")
+
     t_out.Branch("weight",  wei, "weight/D")
 
     f=ROOT.TFile.Open(args.merged_df_root,'READ')
@@ -209,7 +238,7 @@ def build_tree(args):
 
     nentries=t.GetEntries()
     for ientry in progressbar.progressbar(range(nentries)):
-    # for ientry in range(3):
+    # for ientry in range(5):
         t.GetEntry(ientry)
         jets_all = []
         jet_vars = [
@@ -221,90 +250,128 @@ def build_tree(args):
             (t.jet_px_5, t.jet_py_5, t.jet_pz_5, t.jet_e_5),
             (t.jet_px_6, t.jet_py_6, t.jet_pz_6, t.jet_e_6)
         ]
+        if args.jets > 7:
+            jet_vars.append((t.jet_px_7, t.jet_py_7, t.jet_pz_7, t.jet_e_7))
+        if args.jets > 8:
+            jet_vars.append((t.jet_px_8, t.jet_py_8, t.jet_pz_8, t.jet_e_8))
+        if args.jets > 9:
+            jet_vars.append((t.jet_px_9, t.jet_py_9, t.jet_pz_9, t.jet_e_9))
+
         nj= len(jet_vars)
+        if not nj == args.jets: 
+            print('ERROR! nj == args.jets')
+
         for i in range(nj):
             jets_all.append(ROOT.TLorentzVector())
         for i,v in enumerate(jet_vars):
             jets_all[i].SetPxPyPzE(v[0]/1000., v[1]/1000., v[2]/1000., v[3]/1000.) # convert to GeV
 
         from_top = [t.from_top_0, t.from_top_1, t.from_top_2, t.from_top_3, t.from_top_4, t.from_top_5, t.from_top_6]    
+        if args.jets > 7:
+            from_top.append( t.from_top_7)
+        if args.jets > 8:
+            from_top.append( t.from_top_8)
+        if args.jets > 9:
+            from_top.append( t.from_top_9)
         is_b = [t.is_b_0, t.is_b_1, t.is_b_2, t.is_b_3, t.is_b_4, t.is_b_5]
         same_as_lead = [t.same_as_lead_0, t.same_as_lead_1, t.same_as_lead_2, t.same_as_lead_3, t.same_as_lead_4]
 
         import random
-        from_top_random = [random.uniform(0,1) for i in range(7)]
+        from_top_random = [random.uniform(0,1) for i in range(nj)]
         is_b_random = [random.uniform(0,1) for i in range(6)]
         same_as_lead_random = [random.uniform(0,1) for i in range(5)]
 
-        def form_tops(jets_all, from_top, same_as_lead,  is_b):
-            val, idx_isr = min((val, idx_isr) for (idx_isr, val) in enumerate(from_top))
-            # print(val, idx_isr)
+        def form_tops(jets_all, from_top, same_as_lead,  is_b, njets):
+            # print("\n\n\n")
+            idx_isr_list = []
+            from_top_appo = from_top
+            # print('from_top')
+            # print(from_top)
+            for iisr in range(njets-6):                
+                val, idx_isr = min((val, idx_isr) for (idx_isr, val) in enumerate(from_top_appo))
+                from_top_appo[idx_isr] = 999 # for the next iteration I don't want this to be the minimum
+                idx_isr_list.append(idx_isr)
+                # print('  min and pos:',val, idx_isr)
             pred_from_top = [1 for i in range(nj)]
-            pred_from_top[idx_isr]=0
+            for idx_isr in idx_isr_list:
+                pred_from_top[idx_isr]=0
+            # print('pred_from_top')
             # print(pred_from_top)
+
             jets = [j for i,j in enumerate(jets_all) if pred_from_top[i]>0] # remove jet from ISR        
+            from_top_6j = [from_top[i] for i,j in enumerate(jets_all) if pred_from_top[i]>0] # keep track of ISR score of the 6 chosen jets
+            # print('Number of jets considered:', len(jets))
             # find first b
             val, idx_b1 = max((val, idx_b1) for (idx_b1, val) in enumerate(is_b))
             is_b_appo = is_b.copy()
             is_b_appo[idx_b1]=0 # put it temporary at zero to find second b
             val, idx_b2 = max((val, idx_b2) for (idx_b2, val) in enumerate(is_b_appo))
-            pred_is_b = [0 for i in range(nj)]
+            pred_is_b = [0 for i in range(6)]
             pred_is_b[idx_b1]=1
             pred_is_b[idx_b2]=1
+
             # print(pred_is_b)
             # print('Look at same_as_lead')
+            # print("\n\n\n")
+            # print("same_as_lead")
             # print(same_as_lead)
             val, idx_sal1 = max((val, idx_sal1) for (idx_sal1, val) in enumerate(same_as_lead))
             same_as_lead_appo = same_as_lead.copy()
             same_as_lead_appo[idx_sal1]=0    
             val, idx_sal2 = max((val, idx_sal2) for (idx_sal2, val) in enumerate(same_as_lead_appo))
-            # print(idx_sal1, idx_sal1)
-            pred_same_as_lead = [0 for i in range(nj)]
+            # print("idx_sal1, idx_sal2")
+            # print(idx_sal1, idx_sal2)
+            pred_same_as_lead = [0 for i in range(5)]
             pred_same_as_lead[idx_sal1]=1
             pred_same_as_lead[idx_sal2]=1
             pred_same_as_lead.insert(0,1) 
+            # print("pred_same_as_lead")
             # print(pred_same_as_lead)
             t1_list = [t for i,t in enumerate(jets) if pred_same_as_lead[i]>0]
-            # print(t1_list)
+            is_from_top_1 = 0
+            is_from_top_2 = 0
+            sal_score_1 = 1 # len(pred_same_as_lead)=5
+            sal_score_2 = 0
+            for i,p in enumerate(pred_same_as_lead):
+                if p>0:
+                    is_from_top_1 += from_top_6j[i]
+                    if i>0:
+                        sal_score_1 += same_as_lead[i-1]
+                if p<1: # should not need to check i>0 since pred_same_as_lead[0]=1 by construction
+                    is_from_top_2 += from_top_6j[i]
+                    sal_score_2 += (1.0 - same_as_lead[i-1])
+            is_from_top_1 = is_from_top_1/3.0
+            is_from_top_2 = is_from_top_2/3.0
+            sal_score_1 = sal_score_1/3.0
+            sal_score_2 = sal_score_2/3.0
+            sum_score = (is_from_top_1 + is_from_top_2 + sal_score_1 + sal_score_2)/4.0
+            # print("t1_list")
+            # print(len(t1_list))
             t1 = t1_list[0]+t1_list[1]+t1_list[2]
             t2_list = [t for i,t in enumerate(jets) if pred_same_as_lead[i]<1]
+            # print("t2_list")
+            # print(len(t2_list))
             t2 = t2_list[0]+t2_list[1]+t2_list[2]
             if args.pt_order:
                 if t2.Pt() > t1.Pt(): t1,t2=t2,t1 # call t1 the top with leading pt        
-            return t1, t2
+            return t1, t2, (is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score)
 
-        t1, t2 = form_tops(jets_all, from_top, same_as_lead,  is_b)
+        t1, t2, scores = form_tops(jets_all, from_top, same_as_lead,  is_b, args.jets)
         mt1_reco[0] = t1.M()
         mt2_reco[0] = t2.M()
         pt1_reco[0] = t1.Pt()
         pt2_reco[0] = t2.Pt()
+        
+        score_is_from_tt_1[0] = scores[0]
+        score_is_from_tt_2[0] = scores[1]
+        score_same_as_lead_1[0] = scores[2]
+        score_same_as_lead_2[0] = scores[3]
+        score_sum[0] = scores[4]
 
-        t1_random, t2_random = form_tops(jets_all, from_top_random, same_as_lead_random,  is_b_random)
+        t1_random, t2_random, scores_random = form_tops(jets_all, from_top_random, same_as_lead_random,  is_b_random, args.jets)
         mt1_random[0] = t1_random.M()
         mt2_random[0] = t2_random.M()
 
-
-        if t.has_truth:
-            # true info
-            true_from_top = [t.from_top_0_true, t.from_top_1_true, t.from_top_2_true, t.from_top_3_true, t.from_top_4_true, t.from_top_5_true, t.from_top_6_true]
-            jets_true = [j for i,j in enumerate(jets_all) if true_from_top[i]>0] # remove jet from ISR
-            true_is_b = [t.is_b_0_true, t.is_b_1_true, t.is_b_2_true, t.is_b_3_true, t.is_b_4_true, t.is_b_5_true]
-            true_same_as_lead = [t.same_as_lead_0_true, t.same_as_lead_1_true, t.same_as_lead_2_true, t.same_as_lead_3_true, t.same_as_lead_4_true]
-            true_same_as_lead.insert(0,1)
-            t1_list_true = [t for i,t in enumerate(jets_true) if true_same_as_lead[i]>0]
-            t1_true = t1_list_true[0]+t1_list_true[1]+t1_list_true[2]
-            t2_list_true = [t for i,t in enumerate(jets_true) if true_same_as_lead[i]<1]
-            t2_true = t2_list_true[0]+t2_list_true[1]+t2_list_true[2]
-            # call t1 the top with leading pt
-            if args.pt_order:
-                if t2_true.Pt() > t1_true.Pt(): t1_true,t2_true=t2_true,t1_true          
-            mt1_true[0] = t1_true.M()
-            mt2_true[0] = t2_true.M()
-        else:
-            mt1_true[0] = -99
-            mt2_true[0] = -99
-
-        has_truth[0] = int(t.has_truth)
         if t.has_chi2:
             pass_reco_chi2_nobfixed[0] = int(t.pass_reco_chi2_nobfixed)
             pass_reco_chi2_bfixed[0] = int(t.pass_reco_chi2_bfixed)
@@ -327,6 +394,56 @@ def build_tree(args):
             njets[0] =  -99
             njets_25[0] =  -99
             njets_55[0] =  -99
+        if t.has_truth:
+            # true info
+            true_from_top = [t.from_top_0_true, t.from_top_1_true, t.from_top_2_true, t.from_top_3_true, t.from_top_4_true, t.from_top_5_true, t.from_top_6_true]
+            if args.jets > 7:
+                true_from_top.append(t.from_top_7_true)
+            if args.jets > 8:
+                true_from_top.append(t.from_top_8_true)
+            if args.jets > 9:
+                true_from_top.append(t.from_top_9_true)
+            jets_true = [j for i,j in enumerate(jets_all) if true_from_top[i]>0] # remove jet from ISR
+            true_is_b = [t.is_b_0_true, t.is_b_1_true, t.is_b_2_true, t.is_b_3_true, t.is_b_4_true, t.is_b_5_true]
+            true_same_as_lead = [t.same_as_lead_0_true, t.same_as_lead_1_true, t.same_as_lead_2_true, t.same_as_lead_3_true, t.same_as_lead_4_true]
+            true_same_as_lead.insert(0,1)
+            t1_list_true = [t for i,t in enumerate(jets_true) if true_same_as_lead[i]>0]
+            t1_true = t1_list_true[0]+t1_list_true[1]+t1_list_true[2]
+            t2_list_true = [t for i,t in enumerate(jets_true) if true_same_as_lead[i]<1]
+            t2_true = t2_list_true[0]+t2_list_true[1]+t2_list_true[2]
+            # call t1 the top with leading pt
+            if args.pt_order:
+                if t2_true.Pt() > t1_true.Pt(): t1_true,t2_true=t2_true,t1_true          
+            mt1_true[0] = t1_true.M()
+            mt2_true[0] = t2_true.M()
+        
+            alpaca_good_mt1[0] = (round(mt1_true[0],2) == round(mt1_reco[0],2)) or (round(mt2_true[0],2) == round(mt1_reco[0],2))
+            alpaca_good_mt2[0] = (round(mt2_true[0],2) == round(mt2_reco[0],2)) or  (round(mt1_true[0],2) == round(mt2_reco[0],2))
+
+            if t.has_chi2:
+                chi2_good_mt1[0] = (round(mt1_true[0],2) == round(mt1_chi2_nobfixed[0],2)) or (round(mt2_true[0],2) == round(mt1_chi2_nobfixed[0],2))
+                chi2_good_mt2[0] = (round(mt2_true[0],2) == round(mt2_chi2_nobfixed[0],2)) or (round(mt1_true[0],2) == round(mt2_chi2_nobfixed[0],2)) 
+            else:
+                chi2_good_mt1[0] = -99
+                chi2_good_mt2[0] = -99
+
+        else:
+            mt1_true[0] = -99
+            mt2_true[0] = -99
+            alpaca_good_mt1[0] = -99
+            alpaca_good_mt2[0] = -99
+            chi2_good_mt1[0] = -99
+            chi2_good_mt2[0] = -99
+            
+        has_truth[0] = int(t.has_truth)
+
+        '''
+        if t.has_truth and t.has_chi2:
+            print('mt1 chi2:', mt1_chi2_nobfixed[0] ,'  true:',mt1_true[0], ' -->',chi2_good_mt1[0])
+            print('mt2 chi2:', mt2_chi2_nobfixed[0] ,'  true:',mt2_true[0],' -->',chi2_good_mt2[0])
+            print('mt1 alpaca:', mt1_reco[0] ,'  true:',mt1_true[0],' -->',alpaca_good_mt1[0])
+            print('mt2 alpaca:', mt2_reco[0] ,'  true:',mt2_true[0],' -->',chi2_good_mt2[0],'\n')
+        '''
 
         wei[0]=1
         for w in args.weights: 

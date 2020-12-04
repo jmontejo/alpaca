@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
 from math import sqrt, floor
 
+from torch.utils.data import DataLoader
+import numpy as np
 
 __all__ = ['BaseMain']
 
@@ -34,14 +36,14 @@ class BaseMain:
     def get_model(self, args):
         if args.simple_nn:
             from alpaca.nn.simple import SimpleNN
-            return SimpleNN((self.args.jets+self.args.extras)*(4+self.args.nextrafields) + self.args.nscalars, self.args.totaloutputs, fflayers=[200])
+            return SimpleNN((self.args.jets+self.args.extras)*(4+self.args.nextrafields) + self.args.nscalars, self.args.totaloutputs, fflayers=args.fflayers)
         elif args.hydra:
             from alpaca.nn.hydra import Hydra
             log.info('  FeedForwardHead intermediate layers')            
-            return Hydra(self.args.jets+self.args.extras, 30, fflayers=[200],nscalars=self.args.nscalars, nextrafields=self.args.nextrafields)
+            return Hydra(self.args.jets+self.args.extras, args.ncombos, fflayers=args.fflayers,nscalars=self.args.nscalars, nextrafields=self.args.nextrafields)
         else: #ColaLola is default
             from alpaca.nn.colalola import CoLaLoLa
-            return CoLaLoLa(self.args.jets+self.args.extras, 30, self.args.totaloutputs, nscalars=self.args.nscalars,nextrafields=self.args.nextrafields,fflayers=[200])
+            return CoLaLoLa(self.args.jets+self.args.extras, args.ncombos, self.args.totaloutputs, nscalars=self.args.nscalars,nextrafields=self.args.nextrafields,fflayers=args.fflayers)
 
     def run(self):
         args = self.args
@@ -102,22 +104,33 @@ class BaseMain:
                 model = torch.load(param_file)
             else:
                 log.error("Running without training but the model file {} is not present".format(param_file))
-
+        model.eval()
     #def plots(self): ## should store the NN and then do the plotting as a separate step
         output_dir = self.get_output_dir()
         # Run for performance
         for bm in [self.train_bm] + self.test_bm:
             test_torch_batch = bm.get_torch_batch(test_sample)
             X,Y = test_torch_batch[0], test_torch_batch[1]
-            if len(test_torch_batch) > 2: spec = test_torch_batch[2]
-            P  = model(X)
-            _P = P.data.numpy()
             _Y = Y.data.numpy()
+            # if len(test_torch_batch) > 2: spec = test_torch_batch[2]            
+            print('Evaluating on validation saample')
+            _P_list=[]
+            for batch in DataLoader(X, batch_size=250):
+                P_appo  = model(batch)
+                _P_appo = P_appo.data.numpy()
+                _P_list.append(_P_appo)
             #FIXME, think about many bm plots
-                    
+            _P = np.vstack(_P_list)
+            '''            
+            print('looking at staandard way')
+            P=model(X)
+            _P = P.data.numpy()
+            # print('to numpy')
+            # print(_P)
+            '''
         # Write results to file with analysis-specific function
         if args.write_output:
-            self.write_output(test_torch_batch, P)
+            self.write_output(test_torch_batch, _P)
 
         if not args.no_truth: # Only for samples for which I have truth inf
             for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):

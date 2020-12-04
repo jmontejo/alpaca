@@ -1,55 +1,10 @@
 import ROOT
+import os
+import argparse
+import errno
 
 # goal: draw different variables for the same or different selections, same binning, same tree 
 
-mass='mt2'
-
-#out_folder='plots_nopTordered'
-#fname = '/eos/user/c/crizzi/RPV/alpaca/root/outtree_nopTchoice.root'
-# out_folder='plots_nopTordered_hydra'
-out_folder='plots_nopTordered_hydra'
-# fname = '/eos/user/c/crizzi/RPV/alpaca/root/outtree_ttbar_v3.root'
-# fname = '/afs/cern.ch/user/c/crizzi/storage/RPV/alpaca_mio/scripts/outtree_pTordered_hydra.root'
-fname = '/eos/user/c/crizzi/RPV/alpaca/root/outtree_nopTordered_hydra_test_NEW.root'
-
-# variables for all variables plotted with the same selection
-selections = ['1','has_truth','pass_chi2_bfixed', 'pass_chi2_bfixed && has_truth', 'pass_anatop']
-selections = [s+'  && njets==6' for s in selections]
-selections = selections + [s.replace('njets==6','njets>=6') for s in selections]
-name_selections = ['all_events', 'has_truth', 'pass_chi2', 'has_truth_and_pass_chi2','pass_anatop']
-name_selections = [n+'_exactly_6_jets' for n in name_selections]
-name_selections = name_selections + [n.replace('exactly','at_least') for n in name_selections]
-print(selections)
-print(name_selections)
-
-#variables = [mass+'_chi2_nobfixed',mass+'_true']#,mass+'_chi2_nobfixed',mass+'_true']
-variables = [mass+'_chi2_nobfixed', mass+'_chi2_bfixed', mass+'_reco', mass+'_random']
-labels = ['chi2-no-bfixed','chi2-bfixed','alpaca','random']
-
-common_sel_u = 'njets>=6 && njets_25>5'
-selections_u_tmp = ['pass_chi2_nobfixed', 'pass_chi2_bfixed',  '1',                 'has_truth']#,                    'has_truth']
-variables_u =  [mass+'_chi2_nobfixed',    mass+'_chi2_bfixed', mass+'_chi2_nobfixed',mass+'_reco']#, mass+'_true']
-labels_u =     ['chi2<10 nobfixed',       'chi2<10 bfixed',   'chi2 all','alpaca has truth']#,            'true has truth']
-name_sel_u = 'at_least_6_jets_chi2'
-selections_u = [s+'  && '+common_sel_u for s in selections_u_tmp]
-
-
-# variables for Riccardo's plot
-common_sel_r = 'njets==6 && njets_25>5'
-selections_r_tmp = ['pass_chi2_nobfixed',                  'pass_chi2_bfixed',              'has_truth',       '1',         '1']#,                    'has_truth']
-variables_r =  [mass+'_chi2_nobfixed',                  mass+'_chi2_bfixed',            mass+'_reco',      mass+'_reco', mass+'_chi2_nobfixed']#, mass+'_true']
-labels_r =     ['chi2<10 nobfixed',                     'chi2<10 bfixed',               'alpaca has truth','alpaca all', 'chi2 all']#,            'true has truth']
-name_sel_r = 'exactly_6_jets'
-selections_r = [s+'  && '+common_sel_r for s in selections_r_tmp]
-
-# variables for Riccardo's plot
-common_sel_s = 'njets>=6 && njets<=7 && njets_25>5'
-name_sel_s = '6_or_7_jets'
-selections_s = [s+'  && '+common_sel_s for s in selections_r_tmp]
-
-common_sel_t = 'njets>=6 && njets_25>5'
-name_sel_t = 'at_least_6_jets'
-selections_t = [s+'  && '+common_sel_t for s in selections_r_tmp]
 
 
 # kgreen-6
@@ -59,25 +14,9 @@ weight = 'weight'
 bins = (100,0,500)
 tname = 'tree'
 
-
-# test: look at ttbar input file 
-# variables for Riccardo's plot
-'''
-selections_r = ['pass_chi2',           'pass_chi2',           'has_truth',       '1',         '1']#,                    'has_truth']
-variables_r =  [mass+'_chi2_nobfixed', mass+'_chi2_nobfixed', mass+'_reco',      mass+'_reco', mass+'_chi2_nobfixed']#, mass+'_true']
-labels_r =     ['chi2<10 nobfixed',  ' chi2<10 bfixed',       'alpaca has truth','alpaca all', 'chi2 all']#,            'true has truth']
-name_sel_r = 'different_sel'
-fname = ''
-tname = ''
-'''
-#fname, tname, sel, var, bin, label, color
-
-ROOT.gStyle.SetOptStat(0)
-ROOT.gStyle.SetOptTitle(0)
-
 class myHisto:
-    def __init__(self, fname, tname, sel, var, binning, label, color, xaxis='', overflow=True):
-        self.fname=fname
+    def __init__(self, input_file, tname, sel, var, binning, label, color, xaxis='', overflow=True):
+        self.input_file=input_file
         self.tname=tname
         self.var=var
         self.binning=binning
@@ -87,7 +26,7 @@ class myHisto:
         self.sel = sel
         self.overflow = overflow
     def get_histo(self):
-        infile=ROOT.TFile.Open(self.fname,'READ')
+        infile=ROOT.TFile.Open(self.input_file,'READ')
         t=infile.Get(self.tname)
         h_name = self.var
         h = ROOT.TH1D(h_name, self.label, self.binning[0], self.binning[1], self.binning[2])        
@@ -135,8 +74,8 @@ def write_text(write, pad):
         text.DrawLatex(0.15,y, t)
         y = y-0.046
 
-def make_plot(fname, tname, histos_sel, variables, bins, labels, colors, mass, name_selection, all_same_sel=False, unit_area=False, overflow=True):
-    myHistos = [myHisto(fname, tname, histos_sel[i], variables[i], bins, labels[i], colors[i], mass+' [GeV]', overflow=overflow) for i in range(len(variables))]
+def make_plot(input_file, tname, histos_sel, variables, bins, labels, colors, mass, name_selection, all_same_sel=False, unit_area=False, overflow=True, output_folder='./'):
+    myHistos = [myHisto(input_file, tname, histos_sel[i], variables[i], bins, labels[i], colors[i], mass+' [GeV]', overflow=overflow) for i in range(len(variables))]
     histos = [h.get_histo() for h in myHistos]
     if unit_area:
         for h in histos:
@@ -174,28 +113,84 @@ def make_plot(fname, tname, histos_sel, variables, bins, labels, colors, mass, n
     name_can = mass+'_'+name_selection
     if unit_area: name_can += '_unit_area'
     if overflow: name_can += '_overflow'
-    c.SaveAs(out_folder+'/'+name_can+'.pdf')
-
-'''
-for overflow in [True,False]: 
-    for unit_area in [True,False]:
-        make_plot(fname, tname, selections_u, variables_u, bins, labels_u, colors, mass, name_sel_u, all_same_sel=False, unit_area=unit_area, overflow=overflow)
-'''
-
-for overflow in [True,False]: 
-    for unit_area in [True,False]:
-        make_plot(fname, tname, selections_r, variables_r, bins, labels_r, colors, mass, name_sel_r, all_same_sel=False, unit_area=unit_area, overflow=overflow)
-        make_plot(fname, tname, selections_s, variables_r, bins, labels_r, colors, mass, name_sel_s, all_same_sel=False, unit_area=unit_area, overflow=overflow)
-        make_plot(fname, tname, selections_t, variables_r, bins, labels_r, colors, mass, name_sel_t, all_same_sel=False, unit_area=unit_area, overflow=overflow)
-
-for isel,sel in enumerate(selections):
-    print(sel)
-    histos_sel = [sel for i in range(len(variables))]
-    for overflow in [True,False]: 
-        for unit_area in [True,False]:
-            make_plot(fname, tname, histos_sel, variables, bins, labels, colors, mass, name_selections[isel], all_same_sel=True, unit_area=unit_area, overflow=overflow)
-            make_plot(fname, tname, histos_sel, variables, bins, labels, colors, mass, name_selections[isel], all_same_sel=True, unit_area=unit_area, overflow=overflow)
+    c.SaveAs(output_folder+'/'+name_can+'.pdf')
 
 
+def options():
+    parser = argparse.ArgumentParser(usage=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--input-file','-i', required=True, help="Input ROOT file")
+    parser.add_argument('--output-folder','-o', required=True, help="Output folder")
+    return parser.parse_args()
+
+def main():
+
+    ROOT.gStyle.SetOptStat(0)
+    ROOT.gStyle.SetOptTitle(0)
+
+    args = options()
+
+    # create output dir if it doesn't exist
+    try:
+        os.makedirs(args.output_folder)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+        
+    # selections for all variables plotted with the same selection
+    selections = ['1','has_truth','pass_chi2_bfixed', 'pass_chi2_bfixed && has_truth', 'pass_anatop']
+    selections = [s+'  && njets==6' for s in selections]
+    selections = selections + [s.replace('njets==6','njets>=6') for s in selections]
+    name_selections = ['all_events', 'has_truth', 'pass_chi2', 'has_truth_and_pass_chi2','pass_anatop']
+    name_selections = [n+'_exactly_6_jets' for n in name_selections]
+    name_selections = name_selections + [n.replace('exactly','at_least') for n in name_selections]
+        
+    
+    # selections for Riccardo's plot
+    common_sel_r = 'njets==6 && njets_25>5'
+    selections_r_tmp = ['pass_chi2_nobfixed',                  'pass_chi2_bfixed',              'has_truth',       '1',         '1']#,                    'has_truth']
+
+    name_sel_r = 'exactly_6_jets'
+    selections_r = [s+'  && '+common_sel_r for s in selections_r_tmp]
+
+    # variables for Riccardo's plot
+    common_sel_s = 'njets>=6 && njets<=7 && njets_25>5'
+    name_sel_s = '6_or_7_jets'
+    selections_s = [s+'  && '+common_sel_s for s in selections_r_tmp]
+    
+    common_sel_t = 'njets>=6 && njets_25>5'
+    name_sel_t = 'at_least_6_jets'
+    selections_t = [s+'  && '+common_sel_t for s in selections_r_tmp]
+
+
+    for mass in ['mt1', 'mt2']:
+        # variables for all variables plotted with the same selection    
+        #variables = [mass+'_chi2_nobfixed',mass+'_true']#,mass+'_chi2_nobfixed',mass+'_true']
+        variables = [mass+'_chi2_nobfixed', mass+'_chi2_bfixed', mass+'_reco']#, mass+'_random']
+        labels = ['chi2-no-bfixed','chi2-bfixed','alpaca']#,'random']
+        
+        # variables for Riccardo's plot
+        variables_r =  [mass+'_chi2_nobfixed',                  mass+'_chi2_bfixed',            mass+'_reco',      mass+'_reco', mass+'_chi2_nobfixed']#, mass+'_true']
+        labels_r =     ['chi2<10 nobfixed',                     'chi2<10 bfixed',               'alpaca has truth','alpaca all', 'chi2 all']#,            'true has truth']    
+                
+    
+        for overflow in [True,False]: 
+            for unit_area in [True,False]:
+                make_plot(args.input_file, tname, selections_r, variables_r, bins, labels_r, colors, mass, name_sel_r, all_same_sel=False, unit_area=unit_area, overflow=overflow, output_folder=args.output_folder)
+                make_plot(args.input_file, tname, selections_s, variables_r, bins, labels_r, colors, mass, name_sel_s, all_same_sel=False, unit_area=unit_area, overflow=overflow, output_folder=args.output_folder)
+                make_plot(args.input_file, tname, selections_t, variables_r, bins, labels_r, colors, mass, name_sel_t, all_same_sel=False, unit_area=unit_area, overflow=overflow, output_folder=args.output_folder)
+
+        for isel,sel in enumerate(selections):
+            add_var=[mass+'_true'] if 'truth' in sel else[]
+            add_label = ['true has truth'] if 'truth' in sel else []
+            print(sel)
+            histos_sel = [sel for i in range(len(variables+add_var))]
+            for overflow in [True,False]: 
+                for unit_area in [True,False]:
+                    make_plot(args.input_file, tname, histos_sel, variables+add_var, bins, labels+add_label, colors, mass, name_selections[isel], all_same_sel=True, unit_area=unit_area, overflow=overflow, output_folder=args.output_folder)
+
+
+
+if __name__=='__main__':
+    main()
 
 
