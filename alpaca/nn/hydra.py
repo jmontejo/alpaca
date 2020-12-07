@@ -73,6 +73,7 @@ class Hydra(torch.nn.Module):
         if self.nscalars:
             scalars = vectors[:,:self.nscalars]
             vectors = vectors[:,self.nscalars:]            
+        else: scalars = 0
         try:
             vectors = vectors.reshape(vectors.shape[0],self.nobjects,4+self.nextrafields)
         except RuntimeError as e:

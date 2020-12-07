@@ -27,6 +27,8 @@ class BatchManager:
         for input_path, category in zip_longest(args.input_files, args.input_categories):
             df = pd.read_hdf(input_path, dfname)
             df[self.internal_category_name] = category
+            df = df.replace(True, 1)
+            df = df.replace(False, 0)
 
             jets, extras, scalars, labels, spectators = self.get_objects(
                 df, args,
@@ -127,6 +129,11 @@ class BatchManager:
         stop_index = start_index + N
         if stop_index > self.get_nr_events():
             log.warning('The stop index is greater than the size of the array')
+
+        #import sys
+        #np.set_printoptions(threshold=sys.maxsize)
+        #print(self._flatarrays[0:25,:].dtype)
+        #print(self._flatarrays[0:25,:])
 
         X = torch.as_tensor(self._flatarrays[start_index:stop_index, :], dtype=torch.float)
         Y = torch.as_tensor(self._labels[start_index:stop_index, :], dtype=torch.float)
