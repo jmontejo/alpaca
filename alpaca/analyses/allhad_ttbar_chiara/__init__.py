@@ -6,6 +6,8 @@ import numpy as np
 from alpaca.core import BaseMain
 from alpaca.batch import BatchManager
 
+use_btag=True # chiara: put as cli argument
+n_jet_in_input=20 # chiara: can compute this from column names
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +49,8 @@ class MainTtbarChiara(BaseMain):
         _Y = Y.data.numpy()
         _X = X.data.numpy()
         jet_vars = ['jet_px','jet_py','jet_pz','jet_e']
+        if use_btag:
+            jet_vars.append('jet_isDL177')
         col_X = [j+'_'+str(i) for i in range(self.args.jets) for j in jet_vars]
         df_X = pd.DataFrame(data = _X, columns=col_X)
         if len(torch_batch) > 2:
@@ -129,10 +133,10 @@ class BatchManagerTtbarChiara(BatchManager):
         for s in args.spectators:            
             spectators.append(df[s][0]) 
         df = df[[c for c in df.columns if c[0] not in args.spectators]]
-        if args.no_truth:
-            jet_stack = np.swapaxes(df.values.reshape(len(df), 4, 10), 1, 2)
-        else:
-            jet_stack = np.swapaxes(df.values.reshape(len(df), 5, 10), 1, 2)
+        n_comp = 4 # 4 ccomponents for each jet (e, px, py, pz)
+        if use_btag: n_comp += 1 # read also is_btag
+        n_info_jet = n_comp if args.no_truth else n_comp+1 # if reading truth, read also parton label
+        jet_stack = np.swapaxes(df.values.reshape(len(df), n_info_jet, n_jet_in_input), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
 
         #Reverse to intuitive order
@@ -140,10 +144,14 @@ class BatchManagerTtbarChiara(BatchManager):
         jet_px = jet_stack[:, :, 1]
         jet_py = jet_stack[:, :, 2]
         jet_pz = jet_stack[:, :, 3]
+        if use_btag:
+            jet_btag = jet_stack[:, :, 4]
         jet_stack[:, :, 0] = jet_px
         jet_stack[:, :, 1] = jet_py
         jet_stack[:, :, 2] = jet_pz
         jet_stack[:, :, 3] = jet_e
+        if use_btag:
+            jet_stack[:, :, 4] = jet_btag
 
         #jet_stack_pt = np.sqrt(jet_stack[:, :, 0]**2+jet_stack[:, :, 1]**2)
         #jet_stack_eta = np.arcsinh(jet_stack[:, :, 2]/np.maximum(jet_stack_pt,np.ones(jet_stack[:, :,0].shape)))
@@ -159,7 +167,7 @@ class BatchManagerTtbarChiara(BatchManager):
         # At the end there is also additional sanitisation of the input files
         # which removes some events.
 
-        jets = labeledjets[:, :, :4]
+        jets = labeledjets[:, :, :n_comp]
         # print('jets  shape:',jets.shape)
         if use_truth:
             labels = np.array(labeledjets[:, :, -1:].squeeze(), dtype=int) # partonindex
