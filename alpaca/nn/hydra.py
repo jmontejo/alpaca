@@ -64,16 +64,17 @@ class Hydra(torch.nn.Module):
         self.nobjects = nobjects
         self.ncombos = ncombos
         self.fflayers = fflayers
-        self.isr_head = IsrHead(self.nobjects,self.ncombos,self.fflayers)
-        self.decay_head = DecayHead(self.nobjects, self.ncombos,self.fflayers)
         self.nscalars = nscalars
         self.nextrafields = nextrafields
+        self.isr_head = IsrHead(self.nobjects,self.ncombos,self.fflayers, self.nscalars, self.nextrafields)
+        self.decay_head = DecayHead(self.nobjects, self.ncombos,self.fflayers, self.nscalars, self.nextrafields)
 
     def forward(self,vectors):
         if self.nscalars:
             scalars = vectors[:,:self.nscalars]
             vectors = vectors[:,self.nscalars:]            
         else: scalars = 0
+
         try:
             vectors = vectors.reshape(vectors.shape[0],self.nobjects,4+self.nextrafields)
         except RuntimeError as e:
@@ -92,7 +93,6 @@ class Hydra(torch.nn.Module):
             selected_vectors = np.array([np.delete(r,minindices[ie],0) for ie,r in enumerate(selected_vectors)])
         isrtag = torch.from_numpy(isrtag)
         selected_vectors = torch.from_numpy(selected_vectors)
-
         output_decay = self.decay_head(selected_vectors)
         # Concatenate the outputs because this gives the same return structure
         # as single-headed networks
