@@ -122,7 +122,7 @@ if __name__ == '__main__':
     log.info('Nr. of events: %s', bm.get_nr_events())
 
     noutputs = njets*4
-    test_sample = 5000
+    test_sample = 20000
     nr_train = floor(sqrt(bm.get_nr_events()-test_sample))
     batch_size = nr_train
     no_train = os.path.exists(param_file) and not args.force
@@ -268,7 +268,7 @@ if __name__ == '__main__':
     # sample from the last events of the 39k 6-jet events
     fill_arrays(
         bm_6j.get_torch_batch(
-            5000,
+            test_sample,
             start_index=0
         ),
         "6-jet",
