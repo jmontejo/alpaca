@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import roc_curve, auc
 
-__all__ = ['plot_cola_weights', 'plot_hydra_weights', 'plot_roc_curve',
+__all__ = ['plot_cola_weights', 'plot_hydra_weights', 'plot_roc_curve', 'get_roc_auc',
            'plot_score_roc', 'plot_true_ISR', 'plot_index_ISR',
            'plot_topmatch']
 
@@ -24,6 +24,9 @@ def plot_hydra_weights(model, output_dir):
         plt.savefig(str(output_dir / 'w_combo_decay.png'))
         plt.close()
 
+def get_roc_auc(pred,truth):
+    fpr, tpr, thr = roc_curve(truth, pred)
+    return auc(fpr, tpr)
 
 def plot_roc_curve(pred,truth,filename):
     fpr, tpr, thr = roc_curve(truth, pred)

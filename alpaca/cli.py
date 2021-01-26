@@ -5,6 +5,7 @@ import pkgutil
 from pathlib import Path
 
 from progressbar import progressbar
+from collections import namedtuple
 
 import alpaca.analyses
 import alpaca.log
@@ -16,6 +17,8 @@ logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
 log = logging.getLogger('alpaca')
 
+NN_args = namedtuple('NN_args', ['jets', 'zero_jets','extra_jet_fields','extras','outputs','categories','scalars'])
+Run_args = namedtuple('Run_args',['debug','train','tag','input_files','input_categories','shuffle_events','shuffle_jets','fast', 'test_sample','label_roc','fflayers','ncombos','per_jet','simple_nn','cola_lola','hydra','spectators'])
 
 def iter_namespace(ns_pkg):
     # Specifying the second argument (prefix) to iter_modules makes the
@@ -25,6 +28,17 @@ def iter_namespace(ns_pkg):
     return pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + ".")
 
 
+def split_args(args):
+    def digest_accepted(args,_class):
+        print(args.__dict__)
+        accept = {k:v for k,v in args.__dict__.items() if k in _class._fields}
+        nt = _class(**accept)
+        for k in accept: del args.__dict__[k]
+        return nt
+
+    nnargs  = digest_accepted(args, NN_args) 
+    runargs = digest_accepted(args, Run_args)
+    return nnargs, runargs, args
 
 def cli():
     import argparse
@@ -47,34 +61,39 @@ def cli():
                         help='path to the output directory')
     sharedparser.add_argument('--tag', default='alpaca',
                         help='tag the output')
-    sharedparser.add_argument('--jets', help='Number of jets to be used', type=int)
-    sharedparser.add_argument('--zero-jets', help='Number of jet positions that can be left empty', type=int)
-    sharedparser.add_argument('--extra-jet-fields', help='Additional information to be included with the jets', action=UniqueAppend, default=[])
-    sharedparser.add_argument('--spectators', help='List of spectator variables with the same name as in the input df', action=UniqueAppend, default=[])
-    sharedparser.add_argument('--extras', help='Number of extra objects to be used', type=int, default=0)
-    sharedparser.add_argument('--outputs', help='Number of output flags. Comma-separated list with length equal to the number of categories. \
-                                           Can use "N" to read the number of jets. E.g. "N,5,6"')
-    sharedparser.add_argument('--categories', help='Number of categories to consider, or comma-separated list of category names')
-    sharedparser.add_argument('--scalars', help='List of scalar variables to be used in the training', action=UniqueAppend, default=[])
+
     sharedparser.add_argument('--input-files', '-i', required=True, type=Path,
                         action='append',
                         help='path to the file with the input events')
     sharedparser.add_argument('--input-categories', '-ic', type=int,
                         action='append',
-                        help='path to the file with the input events', default=[])
+                        help='Category to assign to each of the input files', default=[])
     sharedparser.add_argument('--shuffle-events', action='store_true')
     sharedparser.add_argument('--shuffle-jets', action='store_true')
     sharedparser.add_argument('--fast', action='store_true',help="Run only over sqrt(N) events for a fast test")
     sharedparser.add_argument('--test-sample', type=int, default=-1, help="How many events to use for the test sample. If running the training, the training sample is all the remaining events. If negative, use the whole sample")
     sharedparser.add_argument('--label-roc', type=str, default="", help="Label added to the name of the ROC curve plots")
-    sharedparser.add_argument('--no-truth', action='store_true')
+
+    #needed to define the NN, we need to know them to apply the NN on a sample
+    sharedparser.add_argument('--jets', help='Number of jets to be used', type=int)
+    sharedparser.add_argument('--zero-jets', help='Number of jet positions that can be left empty', type=int)
+    sharedparser.add_argument('--extra-jet-fields', help='Additional information to be included with the jets', action=UniqueAppend, default=[])
+    sharedparser.add_argument('--extras', help='Number of extra objects to be used', type=int, default=0)
+    sharedparser.add_argument('--outputs', help='Number of output flags. Comma-separated list with length equal to the number of categories. \
+                                           Can use "N" to read the number of jets. E.g. "N,5,6"')
+    sharedparser.add_argument('--categories', help='Number of categories to consider, or comma-separated list of category names')
+    sharedparser.add_argument('--scalars', help='List of scalar variables to be used in the training', action=UniqueAppend, default=[])
+
+    #needed to define the NN, embedded in the architecture but we don't need to know them after training
     sharedparser.add_argument("--fflayers", nargs="+", type=int, default=[200])
     sharedparser.add_argument("--ncombos", type=int, default=30)
-
+    sharedparser.add_argument('--per-jet', action='store_true', help='Run CoLaLola in per-jet mode')
     nnchoice = sharedparser.add_mutually_exclusive_group()
     nnchoice.add_argument("--simple-nn",action="store_true")
     nnchoice.add_argument("--cola-lola",action="store_true")
     nnchoice.add_argument('--hydra', action='store_true')
+    sharedparser.add_argument('--spectators', help='List of spectator variables with the same name as in the input df', action=UniqueAppend, default=[])
+
 
     subparser = parser.add_subparsers(title='analyses commands', dest='subparser')
 
@@ -112,6 +131,9 @@ def cli():
         assert len(args.outputs) == len(args.categories), "Output flags and categories don't match: %r %r"%(args.outputs, args.categories)
     args.ncategories = len(args.categories)
 
+    print(args)
+    #nnargs, runargs, userargs = split_args(args)
+    #main = args.Main(nnargs, runargs, userargs)
     main = args.Main(args)
     main.run()
     #main.plots()

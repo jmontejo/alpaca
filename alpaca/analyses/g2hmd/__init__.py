@@ -16,7 +16,7 @@ def register_cli(subparser,parentparser):
         "Main"       : Main2HDM, #no quotes, pointer to the class
         "extras"     : 3,
         "outputs"    : "n,n,n,n",
-        "jets"       : 6,
+        "jets"       : 7,
         "zero_jets"  : 1,
         "categories" : 4,
         "extra_jet_fields" : ['dl1r'],
@@ -34,9 +34,9 @@ def register_cli(subparser,parentparser):
 
 class Main2HDM(BaseMain):
 
-    def __init__(self, args):
-        super().__init__(args)
-        self.train_bm = BatchManager2HDM(args)
+    def __init__(self, nnargs, runargs, userargs):
+        super().__init__(nnargs, runargs)
+        self.train_bm = BatchManager2HDM(nnargs, userargs)
         self.test_bm  = []
 
     def plots(self):
@@ -92,15 +92,13 @@ class BatchManager2HDM(BatchManager):
         rest_df = df[rest_vars].droplevel(1,axis=1)
         rest_df = rest_df.loc[:,~rest_df.columns.duplicated()]
 
-        scalar_vars = ['n_jet','n_bjet']
-        scalar_df = df[scalar_vars].droplevel(1,axis=1)
-        scalar_df = scalar_df.loc[:,~scalar_df.columns.duplicated()]
+
+
   
         jet_stack = np.swapaxes(jet_df.values.reshape(len(df), len(jet_vars), maxjets), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
         #rest_stack = np.swapaxes(rest_df.values.reshape(len(df), len(jet_vars), 2), 1, 2)
         rest_stack = rest_df.values
-        scalar_stack = scalar_df.values
 
         # The rest of this method is about parsing the partonindex labels to
         # to derive the truth labels that can be used by the NN.
@@ -132,8 +130,6 @@ class BatchManager2HDM(BatchManager):
             return np.concatenate([myisr,myfromlep0,myfromlep1,myfromhad0],axis=1) #FIXME
   
         lep_met = np.stack([lep0,lep1,met],axis=1)
-        lep_met_jets = np.concatenate([lep_met,jets],axis=1)
-        print(args)
         if args.input_categories:
             labels = BatchManager.get_event_labels(df, args.ncategories)
         else:
@@ -151,12 +147,24 @@ class BatchManager2HDM(BatchManager):
         lep_met_clean = np.array([r for r,t in zip(lep_met,labels) if good_labels(t,not args.not_all_partons)])
         jets_clean = np.array([r for r,t in zip(jets,labels) if good_labels(t,not args.not_all_partons)])
         labels_clean = np.array([r for r in labels if good_labels(r,not args.not_all_partons)])
-        scalars_clean = np.array([r for r,t in zip(scalar_stack,labels) if good_labels(t,not args.not_all_partons)])
+        if args.scalars:
+            scalar_df = df[args.scalars].droplevel(1,axis=1)
+            scalar_df = scalar_df.loc[:,~scalar_df.columns.duplicated()]
+            scalar_stack = scalar_df.values
+            scalars_clean = np.array([r for r,t in zip(scalar_stack,labels) if good_labels(t,not args.not_all_partons)])
+        else:
+            scalars_clean = None
 
         if args.extras == 0:
             lep_met_clean = None
         if args.jets == 0:
             jets_clean = None
+
+        #print(jets_clean)
+        #print(lep_met_clean)
+        #print(scalars_clean)
+        #print(labels_clean)
+
 
         return jets_clean, lep_met_clean, scalars_clean, labels_clean, None
 

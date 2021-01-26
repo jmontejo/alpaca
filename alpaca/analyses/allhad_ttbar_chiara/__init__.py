@@ -28,6 +28,8 @@ def register_cli(subparser, parentparser):
     parser = subparser.add_parser(analysis_name, parents=[parentparser],
                                    help='All-hadronic ttbar (Chiara version) sub-command.')
     parser.add_argument('--not-all-partons', action='store_true')
+    parser.add_argument('--no-truth', action='store_true')
+
 
     return analysis_name, analysis_defaults
 

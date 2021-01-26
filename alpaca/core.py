@@ -2,6 +2,7 @@ import logging
 import os
 
 import torch
+torch.set_num_threads(1)
 from alpaca.batch import BatchManager
 from progressbar import progressbar
 
@@ -14,6 +15,7 @@ from math import sqrt, floor
 
 from torch.utils.data import DataLoader
 import numpy as np
+from alpaca.plot import get_roc_auc
 
 __all__ = ['BaseMain']
 
@@ -42,12 +44,16 @@ class BaseMain:
             log.info('  FeedForwardHead intermediate layers')            
             return Hydra(self.args.jets+self.args.extras, args.ncombos, fflayers=args.fflayers,nscalars=self.args.nscalars, nextrafields=self.args.nextrafields)
         else: #ColaLola is default
-            from alpaca.nn.colalola import CoLaLoLa
-            return CoLaLoLa(self.args.jets+self.args.extras, args.ncombos, self.args.totaloutputs, nscalars=self.args.nscalars,nextrafields=self.args.nextrafields,fflayers=args.fflayers)
+            if args.per_jet:
+                from alpaca.nn.colalolaperjet import CoLaLoLaPerJet
+                return CoLaLoLaPerJet(self.args.jets,self.args.extras, args.ncombos, self.args.totaloutputs, nscalars=self.args.nscalars,nextrafields=self.args.nextrafields,fflayers=args.fflayers)
+            else:
+                from alpaca.nn.colalola import CoLaLoLa
+                return CoLaLoLa(self.args.jets+self.args.extras, args.ncombos, self.args.totaloutputs, nscalars=self.args.nscalars,nextrafields=self.args.nextrafields,fflayers=args.fflayers)
 
     def run(self):
         args = self.args
-        test_sample = args.test_sample if args.test_sample >= 0 else self.train_bm.get_nr_events()
+        test_sample = args.test_sample if args.test_sample >= 0 else self.train_bm.get_nr_events()//10
         output_dir = self.get_output_dir()
         output_dir.mkdir(parents=True, exist_ok=True)
         param_file = output_dir / 'NN.pt'
@@ -83,7 +89,7 @@ class BaseMain:
                     Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
                     Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
                     loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi)
-                    loss['total'] += loss[cat]
+                    loss['total'] += loss[cat]/len(args.categories)
 
                 for key, val in loss.items():
                     self.losses[key].append(float(val))
@@ -92,10 +98,26 @@ class BaseMain:
             log.debug('Finished training')
             torch.save(model, param_file )
 
+
+            test_torch_batch = self.train_bm.get_torch_batch(test_sample, 0)
+            X, Y = test_torch_batch[0], test_torch_batch[1]            
+            P = model(X).data.numpy()
+            Y = Y.reshape(-1, args.totaloutputs).data.numpy()
+            for i,cat in enumerate(args.categories):
+                Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
+                Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
+                self.losses["ROC_"+cat] = 0
+                for ijet in range(self.args.jets):
+                    self.losses["ROC_"+cat] += get_roc_auc(Pi[:,ijet],Yi[:,ijet])
+                self.losses["ROC_"+cat]     = [self.losses["ROC_"+cat]/self.args.jets for x in self.losses[cat]]
+
+
             fig = plt.figure()
             for losstype, lossvals in self.losses.items():
                 plt.plot(lossvals, label=losstype)
-            plt.legend()
+            plt.ylim([0,1.5])
+            plt.legend(ncol=2)
+            plt.figtext(0.1,0.9,self.args.tag)
             plt.savefig(str(output_dir / 'losses.png'))
             plt.close()
 

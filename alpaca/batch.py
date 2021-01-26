@@ -21,7 +21,7 @@ class BatchManager:
         tmp_jets = []
         tmp_extras = []
         tmp_scalars = []
-        tmp_labels = []
+        tmp_labels = [] 
         tmp_spectators = []
 
         for input_path, category in zip_longest(args.input_files, args.input_categories):
@@ -47,7 +47,7 @@ class BatchManager:
         labels = np.concatenate(tmp_labels)
         spectators = np.concatenate(tmp_spectators) if tmp_spectators else None
 
-        if args.shuffle_jets and jets:
+        if args.shuffle_jets and jets is not None:
             # shuffle only does the outermost level
             # iterate through rows to shuffle each event individually
             for row in jets:
@@ -145,8 +145,8 @@ class BatchManager:
     def build_flat_arrays(self):
 
         arrays = []
-        if self._jets is not None: arrays.append(self._jets)
         if self._extras is not None: arrays.append(self._extras)
+        if self._jets is not None: arrays.append(self._jets)
         if self._scalars is not None:  arrays.append(self._scalars)
         self._flatarrays = np.concatenate([x.reshape(x.shape[0],-1) for x in arrays],axis=1)
 
