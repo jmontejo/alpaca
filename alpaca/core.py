@@ -133,6 +133,7 @@ class BaseMain:
         for bm in [self.train_bm] + self.test_bm:
             test_torch_batch = bm.get_torch_batch(test_sample)
             X,Y = test_torch_batch[0], test_torch_batch[1]
+            _X = X.data.numpy()
             _Y = Y.data.numpy()
             # if len(test_torch_batch) > 2: spec = test_torch_batch[2]            
             print('Evaluating on validation saample')
@@ -143,6 +144,22 @@ class BaseMain:
                 _P_list.append(_P_appo)
             #FIXME, think about many bm plots
             _P = np.vstack(_P_list)
+            flatdict = {}
+            sample = "Test"
+
+            if self.args.nscalars:
+                _X = _X[:,:-self.args.nscalars]
+            _X = _X.reshape(X.shape[0],self.args.jets+self.args.extras,4+self.args.nextrafields)
+
+            flatdict["jets_{}".format(sample)] = _X
+            for i,cat in enumerate(args.categories):
+                print(cat)
+                Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
+                Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
+                # Flatten & save numpy arrays
+                flatdict["pred_{}_{}".format(cat, sample)] = Pi
+                flatdict["truth_{}_{}".format(cat, sample)] = Yi
+            np.savez(str(output_dir / "data.npz"), **flatdict)
             '''            
             print('looking at staandard way')
             P=model(X)
@@ -154,7 +171,7 @@ class BaseMain:
         if args.write_output:
             self.write_output(test_torch_batch, _P)
 
-        if not args.no_truth: # Only for samples for which I have truth inf
+        if True or not args.no_truth: # Only for samples for which I have truth inf
             for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
                 Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
                 Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
