@@ -103,8 +103,16 @@ def cli():
 
     analysis_defaults = {}
     for a,b in discovered_plugins.items():
-        x = b.register_cli(subparser,sharedparser)
-        analysis_defaults.update( dict((x,) ))
+        sub  = list(iter_namespace(b))
+        print (a,b,sub)
+        if sub:
+            for _1,name,_2 in sub :
+                c = importlib.import_module(name)
+                x = c.register_cli(subparser,sharedparser)
+                analysis_defaults.update( dict((x,) ))
+        else:
+            x = b.register_cli(subparser,sharedparser)
+            analysis_defaults.update( dict((x,) ))
 
     chosensubparser = parser.parse_args().subparser
     parser.set_defaults(**analysis_defaults[chosensubparser])
