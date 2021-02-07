@@ -68,7 +68,7 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
         print(df_chi2_bfixed.shape)
         print(df_chi2_bfixed.head())
 
-    col_truth = ['eventNumber','from_top_0_true',
+    col_truth = ['event_number','from_top_0_true',
                  'from_top_1_true', 'from_top_2_true', 'from_top_3_true',
                  'from_top_4_true', 'from_top_5_true', 'from_top_6_true',
                  'same_as_lead_0_true', 'same_as_lead_1_true', 'same_as_lead_2_true',
@@ -99,7 +99,7 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
 
 
     if not args.no_truth:
-        df_alpaca = pd.merge(df_alpaca_truth, df_alpaca_noTruth, left_on='eventNumber', right_on='eventNumber', how='outer')    
+        df_alpaca = pd.merge(df_alpaca_truth, df_alpaca_noTruth, left_on='event_number', right_on='event_number', how='outer')    
         print('df_alpaca (truth + noTruth)')
         print(df_alpaca.shape)
         print(df_alpaca.head())
@@ -110,9 +110,9 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
     df_alpaca.fillna(0, inplace=True) # put the truth info at zero where missing
     '''
     print('set_index to event')
-    df_alpaca.set_index('eventNumber')
-    df_chi2_nobfixed.set_index('eventNumber')
-    df_chi2_bfixed.set_index('eventNumber')
+    df_alpaca.set_index('event_number')
+    df_chi2_nobfixed.set_index('event_number')
+    df_chi2_bfixed.set_index('event_number')
     '''
     print('df_alpaca (truth + noTruth) after fillna')
     print(df_alpaca.shape)
@@ -120,19 +120,19 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
     
     if not args.no_input_root:
         # df = pd.concat([df_alpaca, df_chi2_nobfixed, df_chi2_bfixed], join='inner', axis=1)
-        df = pd.merge(df_alpaca, df_chi2_nobfixed, left_on='eventNumber', right_on='eventNumber', how='inner')
+        df = pd.merge(df_alpaca, df_chi2_nobfixed, left_on='event_number', right_on='eventNumber', how='inner')
         print('df (alpaca + chi2_nobfixed)')
         print(df.shape)
         print('null elements:',df.isnull().sum().sum())
         print(df.head())
-        df = pd.merge(df, df_chi2_bfixed, left_on='eventNumber', right_on='eventNumber', how='inner')
+        df = pd.merge(df, df_chi2_bfixed, left_on='event_number', right_on='eventNumber', how='inner')
         print('df (alpaca + chi2_nobfixed + chi2_bfixed)')
         print(df.shape)
         print('null elements:',df.isnull().sum().sum())
         print(df.head())
-        print(df[['eventNumber','jet_px_0','jet_py_1','from_top_4_true','reco_t1_m_bfixed','reco_t2_m_bfixed']].head())
+        print(df[['event_number','jet_px_0','jet_py_1','from_top_4_true','reco_t1_m_bfixed','reco_t2_m_bfixed']].head())
         print(df.columns)
-        df = df.drop_duplicates(subset=['eventNumber'])
+        df = df.drop_duplicates(subset=['event_number'])
         print('df after drop duplicates')
         print(df.shape)
         print('null elements:',df.isnull().sum().sum())
@@ -469,7 +469,7 @@ def build_tree(args):
 def main():
     args = options()
 
-    folder_chi2_nobfixed = '/eos/atlas/atlascerngroupdisk/phys-susy/RPV_mutlijets_ANA-SUSY-2019-24/alpaca_tutorial/user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS36_R21_allhad_resolved.root/'
+    folder_chi2_nobfixed = '/eos/atlas/atlascerngroupdisk/phys-susy/RPV_mutlijets_ANA-SUSY-2019-24/zoom_recordings/alpaca_tutorial/user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS36_R21_allhad_resolved.root/'
     files_chi2_nobfixed = ["user.rpoggi.18378247._000001.allhad_resolved.root",
                            "user.rpoggi.18378247._000002.allhad_resolved.root", 
                            "user.rpoggi.18378247._000003.allhad_resolved.root", 
@@ -521,7 +521,7 @@ def main():
     files_chi2_nobfixed = [folder_chi2_nobfixed + f for f in files_chi2_nobfixed] # add folder
     
     
-    folder_chi2_bfixed = '/eos/atlas/atlascerngroupdisk/phys-susy/RPV_mutlijets_ANA-SUSY-2019-24/alpaca_tutorial/user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS34_R21_allhad_resolved.root/'
+    folder_chi2_bfixed = '/eos/atlas/atlascerngroupdisk/phys-susy/RPV_mutlijets_ANA-SUSY-2019-24/zoom_recordings/alpaca_tutorial/user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS34_R21_allhad_resolved.root/'
     files_chi2_bfixed = [ 'user.rpoggi.17773514._000001.allhad_resolved.root', 
                           'user.rpoggi.17773514._000002.allhad_resolved.root', 
                           'user.rpoggi.17773514._000003.allhad_resolved.root', 
