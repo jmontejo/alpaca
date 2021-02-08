@@ -1,10 +1,13 @@
+bin
+lib
 *.pyc
 *.log
 data
 *~
-#*
+*#*#
 *root
 *pdf
 *png
-*out 
-
+*out
+*csv
+*h5
