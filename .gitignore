@@ -1,3 +1,9 @@
 *.pyc
 *.log
 data
+*~
+#*
+*root
+*pdf
+*png
+*out 
