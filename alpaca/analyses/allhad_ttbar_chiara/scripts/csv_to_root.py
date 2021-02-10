@@ -6,6 +6,7 @@ from array import array
 import uproot
 import progressbar
 import argparse
+import itertools
 
 pd.set_option('display.max_columns', None)
 
@@ -293,6 +294,41 @@ def build_tree(args):
         is_b_random = [random.uniform(0,1) for i in range(6)]
         same_as_lead_random = [random.uniform(0,1) for i in range(5)]
 
+
+        def d2_32_from_m32(m_32):
+            # D^2(3,2) = sum( (m(3,2)_{i,j} - 1/sqrt(3))^2  )
+            D2_32 = m_32 - (1/np.sqrt(3))
+            D2_32 = np.power(D2_32, 2)
+            D2_32 = np.sum(D2_32)
+            return D2_32
+
+        def form_dalitz(t1_list,t2_list):
+            pairs = list(itertools.combinations(range(3), 2))
+            # find min and max dR in first gluino
+            m_32_t1 = []
+            m_32_t2 = []
+            t1 = t1_list[0] + t1_list[1] + t1_list[2]
+            t2 = t2_list[0] + t2_list[1] + t2_list[2]
+            den_t1 = t1_list[0].M()**2 + t1_list[1].M()**2 + t1_list[2].M()**2 + t1.M()**2
+            den_t2 = t2_list[0].M()**2 + t2_list[1].M()**2 + t2_list[2].M()**2 + t2.M()**2
+            for p in pairs:
+                qi = t1_list[p[0]]]
+                qj = t1_list[p[1]]]
+                mij2 = (qi+qj).M() ** 2
+                m_32_t1.append(mij2/den_t2)
+            for p in pairs:
+                qi = t2_list[p[0]]]
+                qj = t2_list[p[1]]]
+                mij2 = (qi+qj).M() ** 2
+                m_32_t2.append(mij2/den_t2)
+            # sqrt since now we have the square
+            m_32_t1 = np.sqrt(m_32_t1)
+            m_32_t2 = np.sqrt(m_32_t2)
+            D2_32_t1 = d2_32_from_m32(m_32_t1)
+            D2_32_t2 = d2_32_from_m32(m_32_t2)
+            return 1
+
+
         def form_tops(jets_all, from_top, same_as_lead,  is_b, njets):
             #print('Number of jets:', len(jets_all))
             #print("\n\n\n")
@@ -369,7 +405,11 @@ def build_tree(args):
             # print(len(t2_list))
             t2 = t2_list[0]+t2_list[1]+t2_list[2]
             if args.pt_order:
-                if t2.Pt() > t1.Pt(): t1,t2=t2,t1 # call t1 the top with leading pt        
+                if t2.Pt() > t1.Pt(): 
+                    t1,t2=t2,t1 # call t1 the top with leading pt        
+                    t1_list,t2_list = t2_list,t1_list # change lists as well
+            # dalitz variables 
+            form_dailtz(t1_list,t2_list)
             return t1, t2, (is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score)
 
         t1, t2, scores = form_tops(jets_all, from_top, same_as_lead,  is_b, args.jets)
