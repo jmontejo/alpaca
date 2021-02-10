@@ -315,14 +315,28 @@ def build_tree(args):
             # sqrt since now we have the square
             return np.sqrt(m_32)
 
+        def form_m_63_ijk(t1_list, t2_list):
+            t1 = t1_list[0] + t1_list[1] + t1_list[2]
+            t2 = t2_list[0] + t2_list[1] + t2_list[2]
+            t1t2 = t1 + t2
+            den = 4*(t1t2.M()**2) + 6*np.sum([q.M()**2 for q in t1_list+t2_list])
+            m_63_2 = [(t1.M()**2)/den, (t2.M()**2)/den]
+            return np.sqrt(m_63_2)
+            
+        def form_d2(m_63_ijk, D_32_t1, D_32_t2):
+            d2_a = (np.sqrt(m_63_ijk[0]**2 + D_32_t1**2) - (1./np.sqrt(20)))**2
+            d2_b = (np.sqrt(m_63_ijk[1]**2 + D_32_t2**2) - (1./np.sqrt(20)))**2
+            return d2_a + d2_b 
+
         def form_dalitz(t1_list,t2_list):
             # find min and max dR in first gluino
-            m_32_t1 = from_tlist_to_m32(t1_list)
-            m_32_t2 = from_tlist_to_m32(t2_list)
-            D_32_t1 = d_32_from_m32(m_32_t1)
-            D_32_t2 = d_32_from_m32(m_32_t2)
-            
-            return 1
+            m_32_t1 = from_tlist_to_m32(t1_list) # list of 3
+            m_32_t2 = from_tlist_to_m32(t2_list) # list of 3
+            D_32_t1 = d_32_from_m32(m_32_t1) # single value
+            D_32_t2 = d_32_from_m32(m_32_t2) # single value
+            m_63_ijk = form_m_63_ijk(t1_list, t2_list) # list of 2
+            D2 = form_d2(m_63_ijk, D_32_t1, D_32_t2) # single value
+            return m_32_t1, m_32_t2, D_32_t1, D_32_t2, m_63_ijk, D2
 
 
         def form_tops(jets_all, from_top, same_as_lead,  is_b, njets):
@@ -405,7 +419,7 @@ def build_tree(args):
                     t1,t2=t2,t1 # call t1 the top with leading pt        
                     t1_list,t2_list = t2_list,t1_list # change lists as well
             # dalitz variables 
-            form_dailtz(t1_list,t2_list)
+            m_32_t1, m_32_t2, D_32_t1, D_32_t2, m_63_ijk, D2 = form_dailtz(t1_list,t2_list)
             return t1, t2, (is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score)
 
         t1, t2, scores = form_tops(jets_all, from_top, same_as_lead,  is_b, args.jets)
