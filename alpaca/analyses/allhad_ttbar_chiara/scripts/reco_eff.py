@@ -48,7 +48,7 @@ if by_mass:
         if m==1400:
             infile_name='/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_'+ntype+'_3layers_UDS_1400/outputtree_test.root'
         else:
-            infile_name='/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_'+ntype+'_3layers_UDS_1400/outputtree_test_mg'+str(m)+'_mymatch.root'
+            infile_name='/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_'+ntype+'_3layers_UDS_1400/outputtree_test_mg'+str(m)+'.root'
         infile = ROOT.TFile.Open(infile_name,"READ")
         tree = infile.Get("tree")    
         #jet_sel = ['njets=='+str(ij) for ij in range(6,max_jet)] + ['njets>='+str(max_jet),'njets>=5']
