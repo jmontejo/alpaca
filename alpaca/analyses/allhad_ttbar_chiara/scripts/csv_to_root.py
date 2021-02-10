@@ -71,17 +71,14 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
 
     col_truth = ['event_number','from_top_0_true',
                  'from_top_1_true', 'from_top_2_true', 'from_top_3_true',
-                 'from_top_4_true', 'from_top_5_true', 'from_top_6_true',
+                 'from_top_4_true', 'from_top_5_true',
                  'same_as_lead_0_true', 'same_as_lead_1_true', 'same_as_lead_2_true',
                  'same_as_lead_3_true', 'same_as_lead_4_true', 'is_b_0_true',
                  'is_b_1_true', 'is_b_2_true', 'is_b_3_true', 'is_b_4_true',
                  'is_b_5_true']
-    if args.jets > 7:
-        col_truth.append('from_top_7_true')
-    if args.jets > 8:
-        col_truth.append('from_top_8_true')
-    if args.jets > 9:
-        col_truth.append('from_top_9_true')
+    for ij in range(6,20):        
+        if args.jets > ij:
+            col_truth.append('from_top_'+str(ij)+'_true')
 
     if not args.no_truth:
         df_alpaca_truth=pd.read_csv(args.input_alpaca_truth)
@@ -250,15 +247,20 @@ def build_tree(args):
             (t.jet_px_2, t.jet_py_2, t.jet_pz_2, t.jet_e_2),
             (t.jet_px_3, t.jet_py_3, t.jet_pz_3, t.jet_e_3),
             (t.jet_px_4, t.jet_py_4, t.jet_pz_4, t.jet_e_4),
-            (t.jet_px_5, t.jet_py_5, t.jet_pz_5, t.jet_e_5),
-            (t.jet_px_6, t.jet_py_6, t.jet_pz_6, t.jet_e_6)
+            (t.jet_px_5, t.jet_py_5, t.jet_pz_5, t.jet_e_5)
         ]
+        if args.jets > 6:
+            jet_vars.append((t.jet_px_6, t.jet_py_6, t.jet_pz_6, t.jet_e_6))
         if args.jets > 7:
             jet_vars.append((t.jet_px_7, t.jet_py_7, t.jet_pz_7, t.jet_e_7))
         if args.jets > 8:
             jet_vars.append((t.jet_px_8, t.jet_py_8, t.jet_pz_8, t.jet_e_8))
         if args.jets > 9:
             jet_vars.append((t.jet_px_9, t.jet_py_9, t.jet_pz_9, t.jet_e_9))
+        if args.jets > 10:
+            jet_vars.append((t.jet_px_10, t.jet_py_10, t.jet_pz_10, t.jet_e_10))
+        if args.jets > 11:
+            jet_vars.append((t.jet_px_10, t.jet_py_10, t.jet_pz_10, t.jet_e_10))
 
         nj= len(jet_vars)
         if not nj == args.jets: 
@@ -269,13 +271,20 @@ def build_tree(args):
         for i,v in enumerate(jet_vars):
             jets_all[i].SetPxPyPzE(v[0], v[1], v[2], v[3]) # already in GeV
 
-        from_top = [t.from_top_0, t.from_top_1, t.from_top_2, t.from_top_3, t.from_top_4, t.from_top_5, t.from_top_6]    
+        from_top = [t.from_top_0, t.from_top_1, t.from_top_2, t.from_top_3, t.from_top_4, t.from_top_5]    
+        if args.jets > 6:
+            from_top.append( t.from_top_6)
         if args.jets > 7:
             from_top.append( t.from_top_7)
         if args.jets > 8:
             from_top.append( t.from_top_8)
         if args.jets > 9:
             from_top.append( t.from_top_9)
+        if args.jets > 10:
+            from_top.append( t.from_top_10)
+        if args.jets > 11:
+            from_top.append( t.from_top_11)
+
         is_b = [t.is_b_0, t.is_b_1, t.is_b_2, t.is_b_3, t.is_b_4, t.is_b_5]
         same_as_lead = [t.same_as_lead_0, t.same_as_lead_1, t.same_as_lead_2, t.same_as_lead_3, t.same_as_lead_4]
 
@@ -414,13 +423,19 @@ def build_tree(args):
             njets_55[0] =  njets_55_
         if t.has_truth:
             # true info
-            true_from_top = [t.from_top_0_true, t.from_top_1_true, t.from_top_2_true, t.from_top_3_true, t.from_top_4_true, t.from_top_5_true, t.from_top_6_true]
+            true_from_top = [t.from_top_0_true, t.from_top_1_true, t.from_top_2_true, t.from_top_3_true, t.from_top_4_true, t.from_top_5_true]
+            if args.jets > 6:
+                true_from_top.append(t.from_top_6_true)
             if args.jets > 7:
                 true_from_top.append(t.from_top_7_true)
             if args.jets > 8:
                 true_from_top.append(t.from_top_8_true)
             if args.jets > 9:
                 true_from_top.append(t.from_top_9_true)
+            if args.jets > 10:
+                true_from_top.append(t.from_top_10_true)
+            if args.jets > 11:
+                true_from_top.append(t.from_top_11_true)
             jets_true = [j for i,j in enumerate(jets_all) if true_from_top[i]>0] # remove jet from ISR
             true_is_b = [t.is_b_0_true, t.is_b_1_true, t.is_b_2_true, t.is_b_3_true, t.is_b_4_true, t.is_b_5_true]
             true_same_as_lead = [t.same_as_lead_0_true, t.same_as_lead_1_true, t.same_as_lead_2_true, t.same_as_lead_3_true, t.same_as_lead_4_true]
