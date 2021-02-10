@@ -188,6 +188,14 @@ def build_tree(args):
 
     wei  = array('d',[0])
 
+    #m_32_t1, m_32_t2, D_32_t1, D_32_t2, m_63_ijk, D2 # 3, 3, 1, 1, 2, 1
+    m_32_t1 = array('d',[0,0,0])
+    m_32_t2 = array('d',[0,0,0])
+    D_32_t1 = array('d',[0])
+    D_32_t2 = array('d',[0])
+    m_63_ijk = array('d',[0,0])
+    D2 = array('d',[0])
+
     t_out.Branch("mt1_reco",  mt1_reco, "mt1_reco/D")
     t_out.Branch("mt2_reco",  mt2_reco, "mt2_reco/D")
     t_out.Branch("pt1_reco",  pt1_reco, "pt1_reco/D")
@@ -220,6 +228,13 @@ def build_tree(args):
     t_out.Branch("score_same_as_lead_1",  score_same_as_lead_1, "score_same_as_lead_1/D")
     t_out.Branch("score_same_as_lead_2",  score_same_as_lead_2, "score_same_as_lead_2/D")
     t_out.Branch("score_sum",  score_sum, "score_sum/D")
+
+    t_out.Branch("m_32_t1",  m_32_t1, "m_32_t1[3]/D")
+    t_out.Branch("m_32_t2",  m_32_t2, "m_32_t2[3]/D")
+    t_out.Branch("D_32_t1",  D_32_t1, "D_32_t1/D")
+    t_out.Branch("D_32_t2",  D_32_t2, "D_32_t2/D")
+    t_out.Branch("m_63_ijk",  m_63_ijk, "m_63_ijk[2]/D")
+    t_out.Branch("D2",  D2, "D2/D")
 
     t_out.Branch("weight",  wei, "weight/D")
 
@@ -440,6 +455,21 @@ def build_tree(args):
         score_same_as_lead_1[0] = scores[2]
         score_same_as_lead_2[0] = scores[3]
         score_sum[0] = scores[4]
+
+        #m_32_t1, m_32_t2, D_32_t1, D_32_t2, m_63_ijk, D2
+        m_32_t1[0] = dalitz[0][0]
+        m_32_t1[1] = dalitz[0][1]
+        m_32_t1[2] = dalitz[0][2]
+
+        m_32_t2[0] = dalitz[1][0]
+        m_32_t2[1] = dalitz[1][1]
+        m_32_t2[2] = dalitz[1][2]
+
+        D_32_t1[0] = dalitz[2]
+        D_32_t2[0] = dalitz[3]
+        m_63_ijk[0] = dalitz[4][0]
+        m_63_ijk[1] = dalitz[4][1]
+        D2[0] = dalitz[5]
 
         t1_random, t2_random, scores_random, dalitz_random = form_tops(jets_all, from_top_random, same_as_lead_random,  is_b_random, args.jets)
         mt1_random[0] = t1_random.M()
