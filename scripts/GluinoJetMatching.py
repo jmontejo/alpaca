@@ -7,14 +7,23 @@ import sys
 
 pd.set_option('display.max_columns', None)
 
-folder = '/eos/user/c/crizzi/RPV/ntuples/FT_signal_020321_merged/mc16e/signal/'
-
 store_truth = True
-select_truth = False
+select_truth = True
+split_train_test = 0.88
 
-# h5_name='/eos/user/c/crizzi/RPV/alpaca/h5/mio/truthmatched_unfiltered_test_36_0_1.h5'
-h5_name='/eos/user/c/crizzi/RPV/alpaca/h5/mio/truthmatched_gluino_UDB_1200.h5'
-fname = [folder+'/504516.root']
+folder = '/eos/user/c/crizzi/RPV/ntuples/FT_signal_020321_merged/mc16e/signal/'
+#h5_name='/eos/user/c/crizzi/RPV/alpaca/h5/mio/truthmatched_gluino_UDB_1200.h5'
+#fname = [folder+'/504516.root'] # UDB 1200
+h5_name='/eos/user/c/crizzi/RPV/alpaca/h5/mio/truthmatched_gluino_truth_UDS_1400_all.h5'
+fname = [folder+'/504539.root'] # UDS 1400
+#fname = [folder+'/504518.root'] # UDB 1400
+store_all=True
+#split_train_test = 0.7
+#h5_name='/eos/user/c/crizzi/RPV/alpaca/h5/mio/qcd_FT.h5'
+#fname = ['/eos/user/c/crizzi/RPV/ntuples/FT_merged_skim/qcd.root']
+#h5_name='/eos/user/c/crizzi/RPV/alpaca/h5/mio/qcd_FT_small.h5'
+#fname = ['/eos/user/c/crizzi/RPV/ntuples/FT_merged_skim/tmpOutput/364712.root']
+
 
 print("Working on file '{}'".format(fname))
 # Define parton labels and corresponding indices
@@ -27,55 +36,69 @@ print(partons)
 # Access trees as dataframe iterators reading multiple input files
 print('Making pandas')
 nom_iter = uproot.pandas.iterate(fname,'trees_SRRPV_',entrysteps=float('inf'),branches=['eventNumber','jet_eta','jet_phi','jet_pt','jet_e'])
-truth_iter = uproot.pandas.iterate(fname,'trees_SRRPV_',entrysteps=float('inf'),branches=['eventNumber','truth_QuarkFromGluino_phi','truth_QuarkFromGluino_eta','truth_QuarkFromGluino_pt'])#, 'truth_QuarkFromGluino_ParentBarcode'])
+if store_truth:
+    truth_iter = uproot.pandas.iterate(fname,'trees_SRRPV_',entrysteps=float('inf'),branches=['eventNumber','truth_QuarkFromGluino_phi','truth_QuarkFromGluino_eta','truth_QuarkFromGluino_pt'])#, 'truth_QuarkFromGluino_ParentBarcode'])
+else:
+    truth_iter = uproot.pandas.iterate(fname,'trees_SRRPV_',entrysteps=float('inf'),branches=['eventNumber'])
 
 df_list=[]
+df_list_train=[]
+df_list_test=[]
+df_list_good_match=[]
+df_list_train_good_match=[]
+df_list_test_good_match=[]
+
 ifile = 0
 for nom_df,truth_df  in zip(nom_iter,truth_iter):
     print('Processing file {}'.format(ifile))
     # Merge dataframes on 'eventNumber' key
     # Merging truth into nominal retains only entries in nominal tree
     n_nom = nom_df.unstack(fill_value=0).shape[0]
+    print('chiara debug 0')
     # print(nom_df.head())
-    print(truth_df.head())
     col_orig = truth_df.columns.get_level_values(0) 
-    truth_df = truth_df.unstack(level=-1)
-    col_new = [c+'_'+str(n) for c in col_orig for n in range(6)]
-    #print(col_new)
-    #print(truth_df.columns)
-    #print(truth_df.columns.droplevel(0))
-    truth_df.columns = col_new
-    truth_df['eventNumber'] = truth_df['eventNumber_0']
-    truth_df.index = truth_df['eventNumber']
-    to_keep = [c for c in truth_df.columns if 'truth' in c]
-    truth_df = truth_df[to_keep]
-    col_new = [c+'_'+v for v in ['phi','eta','pt'] for c in partons]
-    print(truth_df.head())
-    print(truth_df.columns)
-    print(col_new)
-    truth_df.columns = col_new
-    truth_df['n_partons_truth'] = sum([truth_df[p+'_phi']*truth_df[p+'_phi']>0 for p in partons])
+    if store_truth or select_truth:
+        print(truth_df.head())
+        truth_df = truth_df.unstack(level=-1)
+        col_new = [c+'_'+str(n) for c in col_orig for n in range(6)]
+        #print(col_new)
+        #print(truth_df.columns)
+        #print(truth_df.columns.droplevel(0))
+        truth_df.columns = col_new
+        truth_df['eventNumber'] = truth_df['eventNumber_0']
+        truth_df.index = truth_df['eventNumber']
+        to_keep = [c for c in truth_df.columns if 'truth' in c]
+        truth_df = truth_df[to_keep]
+        col_new = [c+'_'+v for v in ['phi','eta','pt'] for c in partons]
+        print(truth_df.head())
+        print(truth_df.columns)
+        print(col_new)
+        truth_df.columns = col_new
+        truth_df['n_partons_truth'] = sum([truth_df[p+'_phi']*truth_df[p+'_phi']>0 for p in partons])
+        joined_df = nom_df.join(truth_df,on='eventNumber')        
 
-    joined_df = nom_df.join(truth_df,on='eventNumber')
+        print('  Computing dR')
+        # Compute delta eta and delta phi
+        twopi = 2*math.pi # mod takes precedence over times, so precompute
+        for parton in partons:
+            joined_df['jet_deta_{}'.format(parton)] = joined_df['jet_eta'] - joined_df['{}_eta'.format(parton)]
+            joined_df['jet_dphi_{}'.format(parton)] = (joined_df['jet_phi'] - joined_df['{}_phi'.format(parton)] + math.pi) % twopi - math.pi
+            joined_df['jet_dR_{}'.format(parton)] = np.sqrt(joined_df['jet_deta_{}'.format(parton)]**2 + joined_df['jet_dphi_{}'.format(parton)]**2)    
 
-    print('  Computing dR')
-    # Compute delta eta and delta phi
-    twopi = 2*math.pi # mod takes precedence over times, so precompute
-    for parton in partons:
-        joined_df['jet_deta_{}'.format(parton)] = joined_df['jet_eta'] - joined_df['{}_eta'.format(parton)]
-        joined_df['jet_dphi_{}'.format(parton)] = (joined_df['jet_phi'] - joined_df['{}_phi'.format(parton)] + math.pi) % twopi - math.pi
-        joined_df['jet_dR_{}'.format(parton)] = np.sqrt(joined_df['jet_deta_{}'.format(parton)]**2 + joined_df['jet_dphi_{}'.format(parton)]**2)    
+        # chiara: add loop to compute dR between partons and store minimum
 
-    # chiara: add loop to compute dR between partons and store minimum
-
-    if store_truth:
         # Apply jet-parton matching
         print('  Matching partons to jets')
         dRbranches = ['jet_dR_{}'.format(parton) for parton in partons]        
         match_dRcut = 0.4
         joined_df['partonlabel'] = np.where(joined_df[dRbranches].min(axis=1)<match_dRcut,joined_df[dRbranches].idxmin(axis=1).str.lstrip('jet_dR'),None)
         joined_df['partonindex'] = joined_df['partonlabel'].map(partonindex)
+
+    else:
+        joined_df = nom_df
         
+    print('chiara 1')
+    print(joined_df.shape)
     # Define columns in cartesian coordinates, needed later for the network
     joined_df['jet_px'] = joined_df['jet_pt']*np.cos(joined_df['jet_phi'])
     joined_df['jet_py'] = joined_df['jet_pt']*np.sin(joined_df['jet_phi'])
@@ -148,25 +171,31 @@ for nom_df,truth_df  in zip(nom_iter,truth_iter):
         #print(truncated_df['good_match',0])
         n_partonsexist = truncated_df[truncated_df['n_partons',0]>5].shape[0]
         n_atleastsixmatches = truncated_df[truncated_df['n_matched',0]>5].shape[0]
-        print('chiara: not matched')
-        print(truncated_df[truncated_df['n_matched',0]<=5].head(10))
+        #print('chiara: not matched')
+        #print(truncated_df[truncated_df['n_matched',0]<=5].head(10))
         n_sixmatches = truncated_df[truncated_df['n_matched',0]==6].shape[0]
         n_filtered =truncated_df[(truncated_df['n_matched',0]==6)&(truncated_df['n_partons',0]>5)].shape[0]
         n_good_match = truncated_df[truncated_df['good_match',0]>0].shape[0]
         n_good_match_loose = truncated_df[truncated_df['good_match_loose',0]>0].shape[0]
+
+    print('chiara debug 2')
+    print(truncated_df.shape)
 
     truncated_df['event_number',0] = truncated_df['eventNumber',0]
     truncated_df['n_jets',0] = np.count_nonzero(truncated_df['jet_e']>0 , axis=1)
     #truncated_df['n_DL177',0] = np.count_nonzero(truncated_df['jet_isDL177']>0 , axis=1)
         
     filtered_df = truncated_df
-    if select_truth:
-        filtered_df = filtered_df[(filtered_df['n_matched',0]==6)&(filtered_df['n_partons',0]>5)]
-
-    for ij in range(0,20):
-        for col in ['partonindex']+['jet_'+comp for comp in['e','px','py','pz']]:
-            if not (col,ij) in filtered_df.columns:
-                filtered_df[col,ij] = 0
+    if select_truth or store_truth:
+        for ij in range(0,maxjets):
+            for col in ['partonindex']+['jet_'+comp for comp in['e','px','py','pz']]:
+                if not (col,ij) in filtered_df.columns:
+                    filtered_df[col,ij] = 0
+    else:
+        for ij in range(0,maxjets):
+            for col in ['jet_'+comp for comp in['e','px','py','pz']]:
+                if not (col,ij) in filtered_df.columns:
+                    filtered_df[col,ij] = 0
 
     # Reshape the df to have one event per row,
     # filling each overflow entry with 0's
@@ -176,15 +205,47 @@ for nom_df,truth_df  in zip(nom_iter,truth_iter):
     print('chiara, col', list(filtered_df.columns))
     # chiare: somehow some events become all nan
     filtered_df = filtered_df[filtered_df['eventNumber'].notna()]
+
+    if split_train_test >0:
+        train_index = np.random.random(filtered_df.shape[0]) < split_train_test
+        test_index = ~train_index
+        filtered_df_train = filtered_df[train_index]
+        filtered_df_test = filtered_df[test_index]
+    if select_truth:
+        filtered_df_good_match = filtered_df[(filtered_df['n_matched',0]==6)&(filtered_df['n_partons',0]>5)]
+        if split_train_test >0:
+            filtered_df_train_good_match = filtered_df_train[(filtered_df_train['n_matched',0]==6)&(filtered_df_train['n_partons',0]>5)]
+            filtered_df_test_good_match  = filtered_df_test[(filtered_df_test['n_matched',0] == 6)&(filtered_df_test['n_partons',0]>5)]
     if store_truth:
         #filtered_df['partonindex'] = filtered_df['partonindex'].astype(int)            
-        unstacked_df = filtered_df[jet_cartesian+truth_q_info+['partonindex','event_number','n_partons','n_matched','n_matched_6','good_match','n_jets','good_match_loose']+['good_match_'+str(ij)+'j' for ij in [6,7,8,9,10,11,12]]]
-        unstacked_df = unstacked_df.iloc[:, unstacked_df.columns.get_level_values(1)==0]
-        #unstacked_df = filtered_df[jet_cartesian+['partonindex','event_number','good_match','n_jets']]
-    else:
+        # unstacked_df = unstacked_df.iloc[:, unstacked_df.columns.get_level_values(1)==0] # keep only info on columns (X, 0) and not (X,1)...(X,N)
+        if store_all:
+            unstacked_df = filtered_df[jet_cartesian+truth_q_info+['partonindex','event_number','n_partons','n_matched','n_matched_6','good_match','n_jets','good_match_loose']+['good_match_'+str(ij)+'j' for ij in [6,7,8,9,10,11,12]]]
+        else:
+            unstacked_df = filtered_df[jet_cartesian+['partonindex','event_number','good_match','n_jets']]
+        if split_train_test >0:
+            unstacked_df_train = filtered_df_train[jet_cartesian+['partonindex','event_number','good_match','n_jets']]
+            unstacked_df_test = filtered_df_test[jet_cartesian+['partonindex','event_number','good_match','n_jets']]
+        if select_truth:
+            unstacked_df_good_match = filtered_df_good_match[jet_cartesian+['partonindex','event_number','good_match','n_jets']]
+            if split_train_test >0:
+                unstacked_df_train_good_match = filtered_df_train_good_match[jet_cartesian+['partonindex','event_number','good_match','n_jets']]
+                unstacked_df_test_good_match = filtered_df_test_good_match[jet_cartesian+['partonindex','event_number','good_match','n_jets']]
+    else:        
         unstacked_df = filtered_df[jet_cartesian+['event_number','n_jets']]
+        if split_train_test >0:
+            unstacked_df_train = filtered_df_train[jet_cartesian+['event_number','n_jets']]
+            unstacked_df_test = filtered_df_test[jet_cartesian+['event_number','n_jets']]
 
     unstacked_df.fillna(0,inplace=True)
+    if split_train_test >0:
+        unstacked_df_train.fillna(0,inplace=True)
+        unstacked_df_test.fillna(0,inplace=True)
+    if store_truth:
+        unstacked_df_good_match.fillna(0,inplace=True)
+        if split_train_test >0:
+            unstacked_df_train_good_match.fillna(0,inplace=True)
+            unstacked_df_test_good_match.fillna(0,inplace=True)
     #print(unstacked_df[['n_jets','n_partons','n_matched','n_matched_6','good_match']+['good_match_'+str(ij)+'j' for ij in [6,7,8,9,10,11,12]]].describe())
     #print(unstacked_df.shape)
     #print(list(unstacked_df.columns))
@@ -209,12 +270,46 @@ for nom_df,truth_df  in zip(nom_iter,truth_iter):
     #unstacked_df.to_hdf(h5_name,key='df',mode='w' if ifile==0 else 'a',append=True,complevel=0)
     #print('  Done processing {}'.format(ifile))
     df_list.append(unstacked_df)
+    if split_train_test >0:
+        df_list_train.append(unstacked_df_train)
+        df_list_test.append(unstacked_df_test)
+    if store_truth:
+        df_list_good_match.append(unstacked_df_good_match)
+        if split_train_test >0:
+            df_list_train_good_match.append(unstacked_df_train_good_match)
+            df_list_test_good_match.append(unstacked_df_test_good_match)
     ifile+=1
 
 df=pd.concat(df_list)
 df.to_hdf(h5_name,key='df',mode='w')
+if not store_all:
+    if split_train_test >0:
+        df_train=pd.concat(df_list_train)
+        df_test=pd.concat(df_list_test)
+        df_train.to_hdf(h5_name.replace('.h5','_train.h5').replace('_truth','_noTruth'),key='df',mode='w')
+        df_test.to_hdf(h5_name.replace('.h5','_test.h5').replace('_truth','_noTruth'),key='df',mode='w')
 
 
+    if store_truth:
+        df_good_match=pd.concat(df_list_good_match)
+        if split_train_test >0:
+            df_train_good_match=pd.concat(df_list_train_good_match)
+            df_test_good_match=pd.concat(df_list_test_good_match)
+            df_train_good_match.to_hdf(h5_name.replace('.h5','_train.h5'),key='df',mode='w')
+            df_test_good_match.to_hdf(h5_name.replace('.h5','_test.h5'),key='df',mode='w')
+        df_good_match.to_hdf(h5_name,key='df',mode='w')
+
+
+    print(df.shape[0])
+    print(df_train.shape[0])
+    print(df_test.shape[0])
+    if store_truth:
+        print(df_good_match.shape[0])
+        print(df_train_good_match.shape[0])
+        print(df_test_good_match.shape[0])
+
+
+# print(df.describe())
 
 #print(unstacked_df.shape)
 #print(unstacked_df.columns)

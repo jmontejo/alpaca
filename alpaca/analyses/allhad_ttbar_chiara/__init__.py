@@ -6,7 +6,7 @@ import numpy as np
 from alpaca.core import BaseMain
 from alpaca.batch import BatchManager
 
-use_btag=True # chiara: put as cli argument
+use_btag=False # chiara: put as cli argument
 n_jet_in_input=20 # chiara: can compute this from column names
 
 log = logging.getLogger(__name__)
@@ -132,7 +132,9 @@ class BatchManagerTtbarChiara(BatchManager):
         spectators = []
         for s in args.spectators:            
             spectators.append(df[s][0]) 
-        df = df[[c for c in df.columns if c[0] not in args.spectators]]
+        print('chiara columns')
+        print([c for c in df.columns if c[0] not in args.spectators and c[1]<n_jet_in_input])
+        df = df[[c for c in df.columns if c[0] not in args.spectators and c[1]<n_jet_in_input]]
         n_comp = 4 # 4 ccomponents for each jet (e, px, py, pz)
         if use_btag: n_comp += 1 # read also is_btag
         n_info_jet = n_comp if args.no_truth else n_comp+1 # if reading truth, read also parton label

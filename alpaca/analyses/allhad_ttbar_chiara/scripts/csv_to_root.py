@@ -7,6 +7,7 @@ import uproot
 import progressbar
 import argparse
 
+pd.set_option('display.max_columns', None)
 
 
 def options():
@@ -63,10 +64,10 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
         # df_chi2_bfixed['has_chi2'] = 1
         print('df_chi2_nobfixed')
         print(df_chi2_nobfixed.shape)
-        print(df_chi2_nobfixed.head())
+        #print(df_chi2_nobfixed.head())
         print('df_chi2_bfixed')
         print(df_chi2_bfixed.shape)
-        print(df_chi2_bfixed.head())
+        #print(df_chi2_bfixed.head())
 
     col_truth = ['event_number','from_top_0_true',
                  'from_top_1_true', 'from_top_2_true', 'from_top_3_true',
@@ -88,21 +89,22 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
         df_alpaca_truth['has_truth'] = 1
         print('df_alpaca_truth')
         print(df_alpaca_truth.shape)
-        print(df_alpaca_truth.head())
+        #print(df_alpaca_truth.head())
 
     df_alpaca_noTruth=pd.read_csv(args.input_alpaca_no_truth)
     columns_reco = [c for c in df_alpaca_noTruth.columns if 'true' not in c]
     df_alpaca_noTruth = df_alpaca_noTruth[columns_reco]
     print('df_alpaca_noTruth')
     print(df_alpaca_noTruth.shape)
-    print(df_alpaca_noTruth.head())
+    #print(df_alpaca_noTruth.head())
 
 
     if not args.no_truth:
         df_alpaca = pd.merge(df_alpaca_truth, df_alpaca_noTruth, left_on='event_number', right_on='event_number', how='outer')    
+        #df_alpaca = pd.merge(df_alpaca_truth, df_alpaca_noTruth, left_on='event_number', right_on='event_number', how='inner')    
         print('df_alpaca (truth + noTruth)')
         print(df_alpaca.shape)
-        print(df_alpaca.head())
+        #print(df_alpaca.head())
     else:
         df_alpaca = df_alpaca_noTruth
         df_alpaca_noTruth['has_truth'] = 0
@@ -116,7 +118,8 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
     '''
     print('df_alpaca (truth + noTruth) after fillna')
     print(df_alpaca.shape)
-    print(df_alpaca.head())
+    #print(df_alpaca.describe())
+    #print(df_alpaca.head())
     
     if not args.no_input_root:
         # df = pd.concat([df_alpaca, df_chi2_nobfixed, df_chi2_bfixed], join='inner', axis=1)
@@ -124,19 +127,19 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
         print('df (alpaca + chi2_nobfixed)')
         print(df.shape)
         print('null elements:',df.isnull().sum().sum())
-        print(df.head())
+        #print(df.head())
         df = pd.merge(df, df_chi2_bfixed, left_on='event_number', right_on='eventNumber', how='inner')
         print('df (alpaca + chi2_nobfixed + chi2_bfixed)')
         print(df.shape)
         print('null elements:',df.isnull().sum().sum())
-        print(df.head())
+        #print(df.head())
         print(df[['event_number','jet_px_0','jet_py_1','from_top_4_true','reco_t1_m_bfixed','reco_t2_m_bfixed']].head())
         print(df.columns)
         df = df.drop_duplicates(subset=['event_number'])
         print('df after drop duplicates')
         print(df.shape)
         print('null elements:',df.isnull().sum().sum())
-        print(df.head())
+        #print(df.head())
     else:
         df = df_alpaca
         df['has_chi2'] = 0
@@ -264,7 +267,7 @@ def build_tree(args):
         for i in range(nj):
             jets_all.append(ROOT.TLorentzVector())
         for i,v in enumerate(jet_vars):
-            jets_all[i].SetPxPyPzE(v[0]/1000., v[1]/1000., v[2]/1000., v[3]/1000.) # convert to GeV
+            jets_all[i].SetPxPyPzE(v[0], v[1], v[2], v[3]) # already in GeV
 
         from_top = [t.from_top_0, t.from_top_1, t.from_top_2, t.from_top_3, t.from_top_4, t.from_top_5, t.from_top_6]    
         if args.jets > 7:
@@ -282,21 +285,25 @@ def build_tree(args):
         same_as_lead_random = [random.uniform(0,1) for i in range(5)]
 
         def form_tops(jets_all, from_top, same_as_lead,  is_b, njets):
-            # print("\n\n\n")
+            #print('Number of jets:', len(jets_all))
+            #print("\n\n\n")
+            #print('len jets_all:',len(jets_all))            
             idx_isr_list = []
             from_top_appo = from_top
-            # print('from_top')
-            # print(from_top)
+            #print('from_top')
+            #print(from_top)
+            if not max(from_top)>0: return  0, 0, (0, 0, 0, 0, 0)
             for iisr in range(njets-6):                
                 val, idx_isr = min((val, idx_isr) for (idx_isr, val) in enumerate(from_top_appo))
                 from_top_appo[idx_isr] = 999 # for the next iteration I don't want this to be the minimum
                 idx_isr_list.append(idx_isr)
                 # print('  min and pos:',val, idx_isr)
+            #print('len ISR list:', len(idx_isr_list))
             pred_from_top = [1 for i in range(nj)]
             for idx_isr in idx_isr_list:
                 pred_from_top[idx_isr]=0
-            # print('pred_from_top')
-            # print(pred_from_top)
+            #print('pred_from_top')
+            #print(pred_from_top)
 
             jets = [j for i,j in enumerate(jets_all) if pred_from_top[i]>0] # remove jet from ISR        
             from_top_6j = [from_top[i] for i,j in enumerate(jets_all) if pred_from_top[i]>0] # keep track of ISR score of the 6 chosen jets
@@ -345,11 +352,11 @@ def build_tree(args):
             sal_score_1 = sal_score_1/3.0
             sal_score_2 = sal_score_2/3.0
             sum_score = (is_from_top_1 + is_from_top_2 + sal_score_1 + sal_score_2)/4.0
-            # print("t1_list")
-            # print(len(t1_list))
+            #print("t1_list")
+            #print(len(t1_list))
             t1 = t1_list[0]+t1_list[1]+t1_list[2]
             t2_list = [t for i,t in enumerate(jets) if pred_same_as_lead[i]<1]
-            # print("t2_list")
+            #print("t2_list")
             # print(len(t2_list))
             t2 = t2_list[0]+t2_list[1]+t2_list[2]
             if args.pt_order:
@@ -372,6 +379,17 @@ def build_tree(args):
         mt1_random[0] = t1_random.M()
         mt2_random[0] = t2_random.M()
 
+        njets_=0
+        njets_25_=0
+        njets_55_=0
+        for j in jets_all:
+            if j.Pt()>0:
+                njets_ += 1
+            if j.Pt()>25:
+                njets_25_ += 1
+            if j.Pt()>55:
+                njets_55_ += 1
+
         if t.has_chi2:
             pass_reco_chi2_nobfixed[0] = int(t.pass_reco_chi2_nobfixed)
             pass_reco_chi2_bfixed[0] = int(t.pass_reco_chi2_bfixed)
@@ -391,9 +409,9 @@ def build_tree(args):
             mt2_chi2_nobfixed[0] = -99
             mt1_chi2_bfixed[0] = -99
             mt2_chi2_bfixed[0] = -99
-            njets[0] =  -99
-            njets_25[0] =  -99
-            njets_55[0] =  -99
+            njets[0] = njets_
+            njets_25[0] =  njets_25_
+            njets_55[0] =  njets_55_
         if t.has_truth:
             # true info
             true_from_top = [t.from_top_0_true, t.from_top_1_true, t.from_top_2_true, t.from_top_3_true, t.from_top_4_true, t.from_top_5_true, t.from_top_6_true]
@@ -408,6 +426,14 @@ def build_tree(args):
             true_same_as_lead = [t.same_as_lead_0_true, t.same_as_lead_1_true, t.same_as_lead_2_true, t.same_as_lead_3_true, t.same_as_lead_4_true]
             true_same_as_lead.insert(0,1)
             t1_list_true = [t for i,t in enumerate(jets_true) if true_same_as_lead[i]>0]
+            #print("jets_true")
+            #print(jets_true)
+            #print("len(jets_true)")
+            #print(len(jets_true))
+            #print("t1_list_true")
+            #print(t1_list_true)
+            #print("true_same_as_lead")
+            #print(true_same_as_lead)
             t1_true = t1_list_true[0]+t1_list_true[1]+t1_list_true[2]
             t2_list_true = [t for i,t in enumerate(jets_true) if true_same_as_lead[i]<1]
             t2_true = t2_list_true[0]+t2_list_true[1]+t2_list_true[2]
