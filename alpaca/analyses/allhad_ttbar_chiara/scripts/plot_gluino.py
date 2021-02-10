@@ -11,7 +11,7 @@ ROOT.gROOT.SetBatch(1)
 # colors = [410, 856, 607, 801, 629, 879, 602, 921, 622, 588]
 colors = [856, 801, 410, 629, 879, 607, 602, 921, 622, 588]
 weight = 'weight'
-bins = (60,500,2000)
+bins = (92,500,2800)
 tname = 'tree'
 
 class myHisto:
@@ -79,7 +79,8 @@ def make_plot(input_file, tname, histos_sel, variables, bins, labels, colors, ma
     histos = [h.get_histo() for h in myHistos]
     if unit_area:
         for h in histos:
-            h.Scale(1./h.Integral())
+            if h.Integral()>0:
+                h.Scale(1./h.Integral())            
             #h.Scale(1./5.)
     # print(histos)
     #for h in histos: print(h.GetEntries(), h.GetMean(), h.Integral())

@@ -8,16 +8,24 @@ import sys
 pd.set_option('display.max_columns', None)
 
 store_truth = True
-select_truth = True
-split_train_test = 0.88
+select_truth = False
+split_train_test = 0#0.88
+store_all=False
 
 folder = '/eos/user/c/crizzi/RPV/ntuples/FT_signal_020321_merged/mc16e/signal/'
 #h5_name='/eos/user/c/crizzi/RPV/alpaca/h5/mio/truthmatched_gluino_UDB_1200.h5'
 #fname = [folder+'/504516.root'] # UDB 1200
-h5_name='/eos/user/c/crizzi/RPV/alpaca/h5/mio/truthmatched_gluino_truth_UDS_1400_all.h5'
-fname = [folder+'/504539.root'] # UDS 1400
+#h5_name='/eos/user/c/crizzi/RPV/alpaca/h5/mio/truthmatched_gluino_truth_UDS_1400.h5'
+#fname = [folder+'/504539.root'] # UDS 1400
 #fname = [folder+'/504518.root'] # UDB 1400
-store_all=True
+
+#h5_name='/eos/user/c/crizzi/RPV/alpaca/h5/mio/truthmatched_gluino_truth_UDS_900.h5'
+#fname = [folder+'/504534.root'] # UDS 900
+
+h5_name='/eos/user/c/crizzi/RPV/alpaca/h5/mio/truthmatched_gluino_truth_UDS_2400.h5'
+fname = [folder+'/504549.root'] # UDS 2400
+
+
 #split_train_test = 0.7
 #h5_name='/eos/user/c/crizzi/RPV/alpaca/h5/mio/qcd_FT.h5'
 #fname = ['/eos/user/c/crizzi/RPV/ntuples/FT_merged_skim/qcd.root']
@@ -241,7 +249,7 @@ for nom_df,truth_df  in zip(nom_iter,truth_iter):
     if split_train_test >0:
         unstacked_df_train.fillna(0,inplace=True)
         unstacked_df_test.fillna(0,inplace=True)
-    if store_truth:
+    if select_truth:
         unstacked_df_good_match.fillna(0,inplace=True)
         if split_train_test >0:
             unstacked_df_train_good_match.fillna(0,inplace=True)
@@ -273,7 +281,7 @@ for nom_df,truth_df  in zip(nom_iter,truth_iter):
     if split_train_test >0:
         df_list_train.append(unstacked_df_train)
         df_list_test.append(unstacked_df_test)
-    if store_truth:
+    if select_truth:
         df_list_good_match.append(unstacked_df_good_match)
         if split_train_test >0:
             df_list_train_good_match.append(unstacked_df_train_good_match)
@@ -282,6 +290,7 @@ for nom_df,truth_df  in zip(nom_iter,truth_iter):
 
 df=pd.concat(df_list)
 df.to_hdf(h5_name,key='df',mode='w')
+
 if not store_all:
     if split_train_test >0:
         df_train=pd.concat(df_list_train)
@@ -290,7 +299,7 @@ if not store_all:
         df_test.to_hdf(h5_name.replace('.h5','_test.h5').replace('_truth','_noTruth'),key='df',mode='w')
 
 
-    if store_truth:
+    if select_truth:
         df_good_match=pd.concat(df_list_good_match)
         if split_train_test >0:
             df_train_good_match=pd.concat(df_list_train_good_match)
@@ -301,12 +310,14 @@ if not store_all:
 
 
     print(df.shape[0])
-    print(df_train.shape[0])
-    print(df_test.shape[0])
-    if store_truth:
+    if split_train_test > 0:
+        print(df_train.shape[0])
+        print(df_test.shape[0])
+    if select_truth:
         print(df_good_match.shape[0])
-        print(df_train_good_match.shape[0])
-        print(df_test_good_match.shape[0])
+        if split_train_test > 0:
+            print(df_train_good_match.shape[0])
+            print(df_test_good_match.shape[0])
 
 
 # print(df.describe())
