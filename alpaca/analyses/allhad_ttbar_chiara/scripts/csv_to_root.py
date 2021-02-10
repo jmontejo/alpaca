@@ -305,13 +305,15 @@ def build_tree(args):
         def from_tlist_to_m32(t_list):
             t = t_list[0] + t_list[1] + t_list[2]
             den_t = t_list[0].M()**2 + t_list[1].M()**2 + t_list[2].M()**2 + t.M()**2
+            # print('t.M()',t.M(),'  den_t',den_t)
             m_32 = []
             pairs = list(itertools.combinations(range(3), 2))
             for p in pairs:
-                qi = t_list[p[0]]]
-                qj = t_list[p[1]]]
+                qi = t_list[p[0]]
+                qj = t_list[p[1]]
                 mij2 = (qi+qj).M() ** 2
-                m_32.append(mij2/den_t)
+                if den_t>0: m_32.append(mij2/den_t)
+                else: m_32.append(0)
             # sqrt since now we have the square
             return np.sqrt(m_32)
 
@@ -336,7 +338,12 @@ def build_tree(args):
             D_32_t2 = d_32_from_m32(m_32_t2) # single value
             m_63_ijk = form_m_63_ijk(t1_list, t2_list) # list of 2
             D2 = form_d2(m_63_ijk, D_32_t1, D_32_t2) # single value
-            return m_32_t1, m_32_t2, D_32_t1, D_32_t2, m_63_ijk, D2
+            #print('m_32_t1:', m_32_t1)
+            #print('m_32_t2:', m_32_t2)
+            #print('D_32_t1:', D_32_t1)
+            #print('D_32_t2:', D_32_t2)
+            #print('')
+            return m_32_t1, m_32_t2, D_32_t1, D_32_t2, m_63_ijk, D2 # 3, 3, 1, 1, 2, 1
 
 
         def form_tops(jets_all, from_top, same_as_lead,  is_b, njets):
@@ -419,10 +426,10 @@ def build_tree(args):
                     t1,t2=t2,t1 # call t1 the top with leading pt        
                     t1_list,t2_list = t2_list,t1_list # change lists as well
             # dalitz variables 
-            m_32_t1, m_32_t2, D_32_t1, D_32_t2, m_63_ijk, D2 = form_dailtz(t1_list,t2_list)
-            return t1, t2, (is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score)
+            dalitz_var = form_dalitz(t1_list,t2_list) # lenght of variables: 3, 3, 1, 1, 2, 1
+            return t1, t2, (is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score), dalitz_var
 
-        t1, t2, scores = form_tops(jets_all, from_top, same_as_lead,  is_b, args.jets)
+        t1, t2, scores, dalitz = form_tops(jets_all, from_top, same_as_lead,  is_b, args.jets)
         mt1_reco[0] = t1.M()
         mt2_reco[0] = t2.M()
         pt1_reco[0] = t1.Pt()
@@ -434,7 +441,7 @@ def build_tree(args):
         score_same_as_lead_2[0] = scores[3]
         score_sum[0] = scores[4]
 
-        t1_random, t2_random, scores_random = form_tops(jets_all, from_top_random, same_as_lead_random,  is_b_random, args.jets)
+        t1_random, t2_random, scores_random, dalitz_random = form_tops(jets_all, from_top_random, same_as_lead_random,  is_b_random, args.jets)
         mt1_random[0] = t1_random.M()
         mt2_random[0] = t2_random.M()
 

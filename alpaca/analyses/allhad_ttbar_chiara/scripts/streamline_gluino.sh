@@ -5,7 +5,7 @@ tag=$2
 
 alpaca_dir="/eos/user/c/crizzi/RPV/alpaca/results"
 folder=${alpaca_dir}/${tag}
-for sample in "test_mg2400_mymatch" "test_mg900_mymatch"
+for sample in 'test' #"test_mg2400_mymatch" "test_mg900_mymatch"
 do 
     #echo ${sample}
     cmd="python3 csv_to_root.py --input-alpaca-truth ${folder}/NNoutput_${sample}_truth.csv --input-alpaca-no-truth ${folder}/NNoutput_${sample}_noTruth.csv --merged-df ${folder}/merged_csv_${sample}.csv --merged-df-root ${folder}/merged_csv_${sample}.root --pt-order --output ${folder}/outputtree_${sample}.root ${csv_to_root_options} --build-df --no-input-root"
@@ -13,11 +13,11 @@ do
 	cmd=${cmd}" --train-sample"
     fi
     echo ${cmd}
-    ${cmd}
+    #${cmd}
 
     cmd="python3 plot_gluino.py -i ${folder}/outputtree_${sample}.root -o ${folder}/plots_${sample}"
-    echo ${cmd}
-    ${cmd}
+    #echo ${cmd}
+    #${cmd}
 
  done
 
