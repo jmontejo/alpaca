@@ -295,36 +295,32 @@ def build_tree(args):
         same_as_lead_random = [random.uniform(0,1) for i in range(5)]
 
 
-        def d2_32_from_m32(m_32):
+        def d_32_from_m32(m_32):
             # D^2(3,2) = sum( (m(3,2)_{i,j} - 1/sqrt(3))^2  )
-            D2_32 = m_32 - (1/np.sqrt(3))
-            D2_32 = np.power(D2_32, 2)
-            D2_32 = np.sum(D2_32)
-            return D2_32
+            D_32 = m_32 - (1/np.sqrt(3))
+            D_32 = np.power(D_32, 2)
+            D_32 = np.sum(D_32)
+            return np.sqrt(D_32)
             
         def from_tlist_to_m32(t_list):
+            t = t_list[0] + t_list[1] + t_list[2]
+            den_t = t_list[0].M()**2 + t_list[1].M()**2 + t_list[2].M()**2 + t.M()**2
             m_32 = []
             pairs = list(itertools.combinations(range(3), 2))
             for p in pairs:
                 qi = t_list[p[0]]]
                 qj = t_list[p[1]]]
                 mij2 = (qi+qj).M() ** 2
-                m_32.append(mij2/den_t2)
+                m_32.append(mij2/den_t)
             # sqrt since now we have the square
             return np.sqrt(m_32)
 
         def form_dalitz(t1_list,t2_list):
             # find min and max dR in first gluino
-            m_32_t1 = []
-            m_32_t2 = []
-            t1 = t1_list[0] + t1_list[1] + t1_list[2]
-            t2 = t2_list[0] + t2_list[1] + t2_list[2]
-            den_t1 = t1_list[0].M()**2 + t1_list[1].M()**2 + t1_list[2].M()**2 + t1.M()**2
-            den_t2 = t2_list[0].M()**2 + t2_list[1].M()**2 + t2_list[2].M()**2 + t2.M()**2
             m_32_t1 = from_tlist_to_m32(t1_list)
             m_32_t2 = from_tlist_to_m32(t2_list)
-            D2_32_t1 = d2_32_from_m32(m_32_t1)
-            D2_32_t2 = d2_32_from_m32(m_32_t2)
+            D_32_t1 = d_32_from_m32(m_32_t1)
+            D_32_t2 = d_32_from_m32(m_32_t2)
             
             return 1
 
