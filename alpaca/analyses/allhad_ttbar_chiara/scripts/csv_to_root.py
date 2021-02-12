@@ -28,47 +28,34 @@ def options():
     parser.add_argument('--weights',     default=[],  nargs='*',        help="Weights for output tree as in the csv file")
     return parser.parse_args()
 
-
-def get_chi2_df(files_chi2, suff='', only_mass=False):
-    df_chi2_list=[]
+files_FT=['/eos/user/c/crizzi/RPV/ntuples/FT_merged_skim/qcd.root']
+def get_FT_df(files_FT)
+    df_FT_list=[]
     print('Loading ROOT files')
-    for f in  progressbar.progressbar(files_chi2):
-        tname_chi2 = 'nominal'
-        f_chi2 = uproot.open(f)
-        t_chi2 = f_chi2[tname_chi2]
-        df_chi2_list.append(t_chi2.pandas.df(['eventNumber', 'reco_Chi2Fitted', 'reco_t1_m', 'reco_t2_m', 'jet_pt*','reco_bjets','reco_DRbb','reco_DRbWMax'], flatten=False))
+    for f in  progressbar.progressbar(files_FT):
+        tname_FT = 'trees_SRRPV_'
+        f_FT = uproot.open(f)
+        t_FT = f_FT[tname_FT]
+        df_FT_list.append(t_FT.pandas.df(['mcChannelNumber','mcEventWeight','pass_HLT_ht1000_L1J100','normweight','jet_pt'], flatten=False))
 
-    df_chi2 = pd.concat(df_chi2_list)    
+    df_FT = pd.concat(df_FT_list)    
     
-    df_chi2['njets'] = df_chi2['jet_pt'].apply(lambda x: len(x))
-    df_chi2['njets_55'] = df_chi2['jet_pt'].apply(lambda x: len([j for j in x if j > 55000]))
-    df_chi2['njets_25'] = df_chi2['jet_pt'].apply(lambda x: len([j for j in x if j > 25000]))
-    # selections from all had ttbar analysis, except the mass selection
-    df_chi2['pass_reco_chi2'] = np.where((df_chi2['reco_Chi2Fitted']<10), 1, 0)
-    df_chi2['pass_anatop'] = np.where((df_chi2['njets_55']>5) & (df_chi2['reco_bjets']==2)  & (df_chi2['reco_DRbb']>2) & (df_chi2['reco_DRbWMax']<2.2), 1, 0)
-    if only_mass:
-        df_chi2 = df_chi2[['eventNumber', 'reco_Chi2Fitted', 'reco_t1_m', 'reco_t2_m', 'pass_reco_chi2']]
-    else:
-        df_chi2 = df_chi2[['eventNumber', 'reco_Chi2Fitted', 'reco_t1_m', 'reco_t2_m', 'njets', 'njets_55','njets_25','pass_reco_chi2','pass_anatop']]
-    if len(suff)>0:
-        col_name = [c+'_'+suff if 'reco' in c else c for c in df_chi2.columns]
-        df_chi2.columns = col_name
-    return df_chi2
+    df_FT['njets'] = df_FT['jet_pt'].apply(lambda x: len(x))
+    df_FT['njets_50'] = df_FT['jet_pt'].apply(lambda x: len([j for j in x if j > 50]))
+
+    cols_to_keep=[c for c in df_FT.columns if not 'jet_pt' in c]
+    df_FT=df_FT[cols_to_keep]
+
+    return df_FT
 
 
-def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
+def build_and_store_df(args, files_FT):
     df_to_concat=[]
     if not args.no_input_root:
-        df_chi2_nobfixed = get_chi2_df(files_chi2_nobfixed,'nobfixed')
-        df_chi2_nobfixed['has_chi2'] = 1
-        df_chi2_bfixed = get_chi2_df(files_chi2_bfixed,'bfixed',only_mass=True)
-        # df_chi2_bfixed['has_chi2'] = 1
-        print('df_chi2_nobfixed')
-        print(df_chi2_nobfixed.shape)
-        #print(df_chi2_nobfixed.head())
-        print('df_chi2_bfixed')
-        print(df_chi2_bfixed.shape)
-        #print(df_chi2_bfixed.head())
+        df_FT = get_FT_df(files_FT)
+        df_FT['has_FT'] = 1
+        print('df_FT')
+        print(df_FT.shape)
 
     col_truth = ['event_number','from_top_0_true',
                  'from_top_1_true', 'from_top_2_true', 'from_top_3_true',
@@ -94,6 +81,7 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
     df_alpaca_noTruth = df_alpaca_noTruth[columns_reco]
     print('df_alpaca_noTruth')
     print(df_alpaca_noTruth.shape)
+    print(df_alpaca_noTruth.columns)
     #print(df_alpaca_noTruth.head())
 
 
@@ -108,31 +96,19 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
         df_alpaca_noTruth['has_truth'] = 0
 
     df_alpaca.fillna(0, inplace=True) # put the truth info at zero where missing
-    '''
-    print('set_index to event')
-    df_alpaca.set_index('event_number')
-    df_chi2_nobfixed.set_index('event_number')
-    df_chi2_bfixed.set_index('event_number')
-    '''
+
     print('df_alpaca (truth + noTruth) after fillna')
     print(df_alpaca.shape)
     #print(df_alpaca.describe())
     #print(df_alpaca.head())
     
     if not args.no_input_root:
-        # df = pd.concat([df_alpaca, df_chi2_nobfixed, df_chi2_bfixed], join='inner', axis=1)
-        df = pd.merge(df_alpaca, df_chi2_nobfixed, left_on='event_number', right_on='eventNumber', how='inner')
-        print('df (alpaca + chi2_nobfixed)')
+        df = pd.merge(df_alpaca, df_FT, left_on='event_number', right_on='eventNumber', how='inner')
+        print('df (alpaca + FT)')
         print(df.shape)
         print('null elements:',df.isnull().sum().sum())
         #print(df.head())
-        df = pd.merge(df, df_chi2_bfixed, left_on='event_number', right_on='eventNumber', how='inner')
-        print('df (alpaca + chi2_nobfixed + chi2_bfixed)')
-        print(df.shape)
-        print('null elements:',df.isnull().sum().sum())
-        #print(df.head())
-        print(df[['event_number','jet_px_0','jet_py_1','from_top_4_true','reco_t1_m_bfixed','reco_t2_m_bfixed']].head())
-        print(df.columns)
+        #print(df.columns)
         df = df.drop_duplicates(subset=['event_number'])
         print('df after drop duplicates')
         print(df.shape)
@@ -140,7 +116,7 @@ def build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed):
         #print(df.head())
     else:
         df = df_alpaca
-        df['has_chi2'] = 0
+        df['has_FT'] = 0
     #for c in df.columns:
     #    print('na in', c, df[c].isna().sum())            
     # df.to_csv(args.merged_df)
@@ -171,6 +147,15 @@ def build_tree(args):
     pass_reco_chi2_nobfixed  = array('i',[0])
     pass_reco_chi2_bfixed  = array('i',[0])
     pass_anatop  = array('i',[0])
+    ht_8j = array('d',[0])
+    jet_pt_0 = array('d',[0])
+    jet_pt_1 = array('d',[0])
+    jet_pt_2 = array('d',[0])
+    jet_pt_3 = array('d',[0])
+    jet_pt_4 = array('d',[0])
+    jet_pt_5 = array('d',[0])
+    jet_pt_6 = array('d',[0])
+    jet_pt_7 = array('d',[0])
     njets = array('i',[0])
     njets_25 = array('i',[0])
     njets_55 = array('i',[0])
@@ -204,24 +189,34 @@ def build_tree(args):
     t_out.Branch("mt2_random",  mt2_random, "mt2_random/D")
     t_out.Branch("mt1_true",  mt1_true, "mt1_true/D")
     t_out.Branch("mt2_true",  mt2_true, "mt2_true/D")
-    t_out.Branch("mt1_chi2_bfixed",  mt1_chi2_bfixed, "mt1_chi2_bfixed/D")
-    t_out.Branch("mt2_chi2_bfixed",  mt2_chi2_bfixed, "mt2_chi2_bfixed/D")
-    t_out.Branch("mt1_chi2_nobfixed",  mt1_chi2_nobfixed, "mt1_chi2_nobfixed/D")
-    t_out.Branch("mt2_chi2_nobfixed",  mt2_chi2_nobfixed, "mt2_chi2_nobfixed/D")
+    #t_out.Branch("mt1_chi2_bfixed",  mt1_chi2_bfixed, "mt1_chi2_bfixed/D")
+    #t_out.Branch("mt2_chi2_bfixed",  mt2_chi2_bfixed, "mt2_chi2_bfixed/D")
+    #t_out.Branch("mt1_chi2_nobfixed",  mt1_chi2_nobfixed, "mt1_chi2_nobfixed/D")
+    #t_out.Branch("mt2_chi2_nobfixed",  mt2_chi2_nobfixed, "mt2_chi2_nobfixed/D")
+
+    t_out.Branch("ht_8j",  ht_8j, "ht_8j/D")
+    t_out.Branch("jet_pt_0",  jet_pt_0, "jet_pt_0/D")
+    t_out.Branch("jet_pt_1",  jet_pt_1, "jet_pt_1/D")
+    t_out.Branch("jet_pt_2",  jet_pt_2, "jet_pt_2/D")
+    t_out.Branch("jet_pt_3",  jet_pt_3, "jet_pt_3/D")
+    t_out.Branch("jet_pt_4",  jet_pt_4, "jet_pt_4/D")
+    t_out.Branch("jet_pt_5",  jet_pt_5, "jet_pt_5/D")
+    t_out.Branch("jet_pt_6",  jet_pt_6, "jet_pt_6/D")
+    t_out.Branch("jet_pt_7",  jet_pt_7, "jet_pt_7/D")
 
     t_out.Branch("njets",  njets, "njets/I")
     t_out.Branch("njets_25",  njets_25, "njets_25/I")
     t_out.Branch("njets_55",  njets_55, "njets_55/I")
 
     t_out.Branch("has_truth",  has_truth, "has_truth/I")
-    t_out.Branch("pass_chi2_nobfixed",  pass_reco_chi2_nobfixed, "pass_chi2_nobfixed/I")
-    t_out.Branch("pass_chi2_bfixed",  pass_reco_chi2_bfixed, "pass_chi2_bfixed/I")
-    t_out.Branch("pass_anatop",  pass_anatop, "pass_anatop/I")
+    #t_out.Branch("pass_chi2_nobfixed",  pass_reco_chi2_nobfixed, "pass_chi2_nobfixed/I")
+    #t_out.Branch("pass_chi2_bfixed",  pass_reco_chi2_bfixed, "pass_chi2_bfixed/I")
+    #t_out.Branch("pass_anatop",  pass_anatop, "pass_anatop/I")
     
     t_out.Branch("alpaca_good_mt1",  alpaca_good_mt1, "alpaca_good_mt1/I")
     t_out.Branch("alpaca_good_mt2",  alpaca_good_mt2, "alpaca_good_mt2/I")
-    t_out.Branch("chi2_good_mt1",  chi2_good_mt1, "chi2_good_mt1/I")
-    t_out.Branch("chi2_good_mt2",  chi2_good_mt2, "chi2_good_mt2/I")
+    #t_out.Branch("chi2_good_mt1",  chi2_good_mt1, "chi2_good_mt1/I")
+    #t_out.Branch("chi2_good_mt2",  chi2_good_mt2, "chi2_good_mt2/I")
 
     t_out.Branch("score_is_from_tt_1",  score_is_from_tt_1, "score_is_from_tt_1/D")
     t_out.Branch("score_is_from_tt_2",  score_is_from_tt_2, "score_is_from_tt_2/D")
@@ -253,6 +248,7 @@ def build_tree(args):
     '''
 
     nentries=t.GetEntries()
+    #nentries=1000 # chiara: tmp test
     for ientry in progressbar.progressbar(range(nentries)):
     # for ientry in range(5):
         t.GetEntry(ientry)
@@ -478,36 +474,43 @@ def build_tree(args):
         njets_=0
         njets_25_=0
         njets_55_=0
-        for j in jets_all:
-            if j.Pt()>0:
-                njets_ += 1
+        try:
+            njets_ = int(getattr(t, 'n_jets'))
+        except:
+            for j in jets_all:
+                if j.Pt()>0:
+                    njets_ += 1
+        #print('computing HT')
+        ht_8j[0] = 0
+        for ij,j in enumerate(jets_all):
+            ht_8j[0] += j.Pt()
+            #print('  adding:', j.Pt())
+            if ij==0: jet_pt_0[0]=j.Pt()
+            elif ij==1: jet_pt_1[0]=j.Pt()
+            elif ij==2: jet_pt_2[0]=j.Pt()
+            elif ij==3: jet_pt_3[0]=j.Pt()
+            elif ij==4: jet_pt_4[0]=j.Pt()
+            elif ij==5: jet_pt_5[0]=j.Pt()
+            elif ij==6: jet_pt_6[0]=j.Pt()
+            elif ij==7: jet_pt_7[0]=j.Pt()
             if j.Pt()>25:
                 njets_25_ += 1
             if j.Pt()>55:
                 njets_55_ += 1
+        #print('ht:', ht_8j)
 
-        if t.has_chi2:
-            pass_reco_chi2_nobfixed[0] = int(t.pass_reco_chi2_nobfixed)
-            pass_reco_chi2_bfixed[0] = int(t.pass_reco_chi2_bfixed)
-            pass_anatop[0] = int(t.pass_anatop)
-            mt1_chi2_nobfixed[0] = t.reco_t1_m_nobfixed / 1000.
-            mt2_chi2_nobfixed[0] = t.reco_t2_m_nobfixed / 1000.
-            mt1_chi2_bfixed[0] = t.reco_t1_m_bfixed / 1000.
-            mt2_chi2_bfixed[0] = t.reco_t2_m_bfixed / 1000.
-            njets[0] =  t.njets
-            njets_25[0] =  t.njets_25
-            njets_55[0] =  t.njets_55
-        else:
-            pass_reco_chi2_nobfixed[0] = -99
-            pass_reco_chi2_bfixed[0] = -99
-            pass_anatop[0] = -99
-            mt1_chi2_nobfixed[0] = -99
-            mt2_chi2_nobfixed[0] = -99
-            mt1_chi2_bfixed[0] = -99
-            mt2_chi2_bfixed[0] = -99
-            njets[0] = njets_
-            njets_25[0] =  njets_25_
-            njets_55[0] =  njets_55_
+        njets[0] = njets_
+        njets_25[0] =  njets_25_
+        njets_55[0] =  njets_55_
+
+        pass_reco_chi2_nobfixed[0] = -99
+        pass_reco_chi2_bfixed[0] = -99
+        pass_anatop[0] = -99
+        mt1_chi2_nobfixed[0] = -99
+        mt2_chi2_nobfixed[0] = -99
+        mt1_chi2_bfixed[0] = -99
+        mt2_chi2_bfixed[0] = -99
+        
         if t.has_truth:
             # true info
             true_from_top = [t.from_top_0_true, t.from_top_1_true, t.from_top_2_true, t.from_top_3_true, t.from_top_4_true, t.from_top_5_true]
@@ -547,13 +550,15 @@ def build_tree(args):
         
             alpaca_good_mt1[0] = (round(mt1_true[0],2) == round(mt1_reco[0],2)) or (round(mt2_true[0],2) == round(mt1_reco[0],2))
             alpaca_good_mt2[0] = (round(mt2_true[0],2) == round(mt2_reco[0],2)) or  (round(mt1_true[0],2) == round(mt2_reco[0],2))
-
+            
+            '''
             if t.has_chi2:
                 chi2_good_mt1[0] = (round(mt1_true[0],2) == round(mt1_chi2_nobfixed[0],2)) or (round(mt2_true[0],2) == round(mt1_chi2_nobfixed[0],2))
                 chi2_good_mt2[0] = (round(mt2_true[0],2) == round(mt2_chi2_nobfixed[0],2)) or (round(mt1_true[0],2) == round(mt2_chi2_nobfixed[0],2)) 
             else:
-                chi2_good_mt1[0] = -99
-                chi2_good_mt2[0] = -99
+            '''
+            chi2_good_mt1[0] = -99
+            chi2_good_mt2[0] = -99
 
         else:
             mt1_true[0] = -99
@@ -564,14 +569,6 @@ def build_tree(args):
             chi2_good_mt2[0] = -99
             
         has_truth[0] = int(t.has_truth)
-
-        '''
-        if t.has_truth and t.has_chi2:
-            print('mt1 chi2:', mt1_chi2_nobfixed[0] ,'  true:',mt1_true[0], ' -->',chi2_good_mt1[0])
-            print('mt2 chi2:', mt2_chi2_nobfixed[0] ,'  true:',mt2_true[0],' -->',chi2_good_mt2[0])
-            print('mt1 alpaca:', mt1_reco[0] ,'  true:',mt1_true[0],' -->',alpaca_good_mt1[0])
-            print('mt2 alpaca:', mt2_reco[0] ,'  true:',mt2_true[0],' -->',chi2_good_mt2[0],'\n')
-        '''
 
         wei[0]=1
         for w in args.weights: 
@@ -597,111 +594,13 @@ def build_tree(args):
 def main():
     args = options()
 
-    folder_chi2_nobfixed = '/eos/atlas/atlascerngroupdisk/phys-susy/RPV_mutlijets_ANA-SUSY-2019-24/zoom_recordings/alpaca_tutorial/user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS36_R21_allhad_resolved.root/'
-    files_chi2_nobfixed = ["user.rpoggi.18378247._000001.allhad_resolved.root",
-                           "user.rpoggi.18378247._000002.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000003.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000004.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000005.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000006.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000007.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000008.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000009.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000001.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000010.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000011.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000012.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000013.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000014.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000015.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000016.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000017.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000018.allhad_resolved.root", 
-                           "user.rpoggi.18378247._000019.allhad_resolved.root"]
-    if args.train_sample:
-        files_chi2_nobfixed = ["user.rpoggi.18378247._000020.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000021.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000022.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000023.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000024.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000025.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000026.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000027.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000028.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000029.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000030.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000031.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000032.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000033.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000034.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000035.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000036.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000037.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000038.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000039.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000040.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000041.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000042.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000043.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000044.allhad_resolved.root", 
-                               "user.rpoggi.18378247._000045.allhad_resolved.root"]
-        
-    files_chi2_nobfixed = [folder_chi2_nobfixed + f for f in files_chi2_nobfixed] # add folder
-    
-    
-    folder_chi2_bfixed = '/eos/atlas/atlascerngroupdisk/phys-susy/RPV_mutlijets_ANA-SUSY-2019-24/zoom_recordings/alpaca_tutorial/user.rpoggi.410471.PhPy8EG.DAOD_TOPQ1.e6337_e5984_s3126_r9364_r9315_p3629.TTDIFFXS34_R21_allhad_resolved.root/'
-    files_chi2_bfixed = [ 'user.rpoggi.17773514._000001.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000002.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000003.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000004.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000005.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000006.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000007.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000008.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000009.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000010.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000011.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000012.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000013.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000014.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000015.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000016.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000017.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000018.allhad_resolved.root', 
-                          'user.rpoggi.17773514._000019.allhad_resolved.root',
-                          'user.rpoggi.17773514._000020.allhad_resolved.root',
-                          'user.rpoggi.17773514._000021.allhad_resolved.root',
-                          'user.rpoggi.17773514._000022.allhad_resolved.root',
-                          'user.rpoggi.17773514._000023.allhad_resolved.root',
-                          'user.rpoggi.17773514._000024.allhad_resolved.root',
-                          'user.rpoggi.17773514._000025.allhad_resolved.root',
-                          'user.rpoggi.17773514._000026.allhad_resolved.root',
-                          'user.rpoggi.17773514._000027.allhad_resolved.root',
-                          'user.rpoggi.17773514._000028.allhad_resolved.root',
-                          'user.rpoggi.17773514._000029.allhad_resolved.root',
-                          'user.rpoggi.17773514._000030.allhad_resolved.root',
-                          'user.rpoggi.17773514._000031.allhad_resolved.root',
-                          'user.rpoggi.17773514._000032.allhad_resolved.root',
-                          'user.rpoggi.17773514._000033.allhad_resolved.root',
-                          'user.rpoggi.17773514._000034.allhad_resolved.root',
-                          'user.rpoggi.17773514._000035.allhad_resolved.root',
-                          'user.rpoggi.17773514._000036.allhad_resolved.root',
-                          'user.rpoggi.17773514._000037.allhad_resolved.root',
-                          'user.rpoggi.17773514._000038.allhad_resolved.root',
-                          'user.rpoggi.17773514._000039.allhad_resolved.root',
-                          'user.rpoggi.17773514._000040.allhad_resolved.root',
-                          'user.rpoggi.17773514._000041.allhad_resolved.root',
-                          'user.rpoggi.17773514._000042.allhad_resolved.root']
-
-    files_chi2_bfixed = [folder_chi2_bfixed + f for f in files_chi2_bfixed] # add folder
-
     if args.build_df:
         df = build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed)
         to_root(df, args.merged_df_root, key=args.output_tree)
 
     m1, m2 = build_tree(args)
-    df['m1_chiara'] = m1
-    df['m2_chiara'] =  m2
+    #df['m1_chiara'] = m1
+    #df['m2_chiara'] =  m2
     df.to_csv((args.output).replace('root','csv'))
 
 if __name__=='__main__':

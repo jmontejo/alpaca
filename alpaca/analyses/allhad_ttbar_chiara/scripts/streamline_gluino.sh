@@ -8,7 +8,7 @@ folder=${alpaca_dir}/${tag}
 for sample in 'test_dijet' #'test' #"test_mg2400_mymatch" "test_mg900_mymatch"
 do 
     #echo ${sample}
-    cmd="python3 csv_to_root.py --input-alpaca-truth ${folder}/NNoutput_${sample}_truth.csv --input-alpaca-no-truth ${folder}/NNoutput_${sample}_noTruth.csv --merged-df ${folder}/merged_csv_${sample}.csv --merged-df-root ${folder}/merged_csv_${sample}.root --pt-order --output ${folder}/outputtree_${sample}.root ${csv_to_root_options} --build-df --no-input-root"
+    cmd="python3 csv_to_root.py --input-alpaca-truth ${folder}/NNoutput_${sample}_truth.csv --input-alpaca-no-truth ${folder}/NNoutput_${sample}_noTruth.csv --merged-df ${folder}/merged_csv_${sample}.csv --merged-df-root ${folder}/merged_csv_${sample}.root --pt-order --output ${folder}/outputtree_${sample}.root ${csv_to_root_options} --build-df --no-input-root --weights weight" 
     if [ "${sample}" = "train" ]; then
 	cmd=${cmd}" --train-sample"
     fi
