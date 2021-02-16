@@ -139,9 +139,9 @@ class BatchManagerGluGlu(BatchManager):
                 spectators.append(df[s][0]) 
             else:
                 spectators.append(np.zeros(len(df)))
-        print('chiara columns')
-        print(df.columns)
-        print([c for c in df.columns if c[0] not in args.spectators and (not 'alpaca' in c[0] and c[1]<n_jet_in_input)])
+        #print('chiara columns')
+        #print(df.columns)
+        #print([c for c in df.columns if c[0] not in args.spectators and (not 'alpaca' in c[0] and c[1]<n_jet_in_input)])
         df_jets = df[[c for c in df.columns if c[0] not in args.spectators and (not 'alpaca' in c[0] and c[1]<n_jet_in_input)]]
         n_comp = 4 # 4 ccomponents for each jet (e, px, py, pz)
         if use_btag: n_comp += 1 # read also is_btag
@@ -183,14 +183,14 @@ class BatchManagerGluGlu(BatchManager):
         # signal vs background classification
         if args.input_categories:
             print('Chiara! Doing signal vs background classification')
-            print('ncategories', args.ncategories)
+            #print('ncategories', args.ncategories)
             labels = BatchManager.get_event_labels(df, args.ncategories)
-            print(labels.shape)
-            print(labels)
+            #print(labels.shape)
+            #print(labels)
             # chiara 
             labels = labels.values.reshape(len(labels),1)
             print(labels.shape)
-            print(labels)
+            #print(labels)
             spectators_formatted = np.vstack(spectators).T if(len(args.spectators)>0) else None
             return jets,None,None, labels, spectators_formatted
 
