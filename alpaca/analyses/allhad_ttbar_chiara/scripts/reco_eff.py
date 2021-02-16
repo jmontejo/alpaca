@@ -22,14 +22,16 @@ def print_eff(tree, jet_sel,max_jet):
         alpaca_good_mt2 = round(100*(n_alpaca_good_mt2)/has_truth,1)
         n_alpaca_good_both = tree.GetEntries("alpaca_good_mt2==1 && alpaca_good_mt1==1 &&"+j)
         alpaca_good_both = round(100*(n_alpaca_good_both)/has_truth,1)
-        
+
+        has_truth_wrttot = round(100*(has_truth)/total,1)
         alpaca_good_mt1_wrttot = round(100*(n_alpaca_good_mt1)/total,1)
         alpaca_good_mt2_wrttot = round(100*(n_alpaca_good_mt2)/total,1)
         alpaca_good_both_wrttot = round(100*(n_alpaca_good_both)/total,1)
         
         #print(j, ' & ', chi2_good_mt1, '\\% & ', chi2_good_mt2, '\\% & ', chi2_good_both, '\\% & ', alpaca_good_mt1, '\\% & ', alpaca_good_mt2, '\\% & ', alpaca_good_both,'\\% \\\\')
-        print(max_jet,' & ',j.replace('njets>=5','Inclusive'), ' & ', alpaca_good_mt1, '\\% & ', alpaca_good_mt2, '\\% & ', alpaca_good_both,
-              ' & ', alpaca_good_mt1_wrttot, '\\% & ', alpaca_good_mt2_wrttot, '\\% & ', alpaca_good_both_wrttot,
+        #print(max_jet,' & ',j.replace('njets>=5','Inclusive'), ' & ', alpaca_good_mt1, '\\% & ', alpaca_good_mt2, '\\% & ', alpaca_good_both,
+        print(max_jet,' & ', has_truth_wrttot , '\\% & ', alpaca_good_mt1, '\\% & ', alpaca_good_mt2, '\\% & ', alpaca_good_both,
+              '\\% & ', alpaca_good_mt1_wrttot, '\\% & ', alpaca_good_mt2_wrttot, '\\% & ', alpaca_good_both_wrttot,
         '\\% \\\\')
         print('\\hline')
 

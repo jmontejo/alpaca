@@ -26,22 +26,34 @@ def options():
     parser.add_argument('--output',     default='outtree_nopTchoice.root',        help="Name of output ROOT file")
     parser.add_argument('--jets', '-j',    default=7,        help="How many jets have been used to train alpaca? (atm max 10)", type=int)
     parser.add_argument('--weights',     default=[],  nargs='*',        help="Weights for output tree as in the csv file")
+    parser.add_argument('--presel',   action='store_true',        help="Apply preselection")
     return parser.parse_args()
 
 files_FT=['/eos/user/c/crizzi/RPV/ntuples/FT_merged_skim/qcd.root']
-def get_FT_df(files_FT)
+#files_FT=['/eos/user/c/crizzi/RPV/ntuples/FT_signal_020321_merged/mc16e/signal/504539.root']
+def get_FT_df(files_FT, presel=False):
     df_FT_list=[]
     print('Loading ROOT files')
     for f in  progressbar.progressbar(files_FT):
         tname_FT = 'trees_SRRPV_'
         f_FT = uproot.open(f)
         t_FT = f_FT[tname_FT]
-        df_FT_list.append(t_FT.pandas.df(['mcChannelNumber','mcEventWeight','pass_HLT_ht1000_L1J100','normweight','jet_pt'], flatten=False))
+        df_FT_list.append(t_FT.pandas.df(['mcChannelNumber','mcEventWeight','eventNumber','pass_HLT_ht1000_L1J100','normweight','jet_pt'], flatten=False))
 
     df_FT = pd.concat(df_FT_list)    
     
     df_FT['njets'] = df_FT['jet_pt'].apply(lambda x: len(x))
     df_FT['njets_50'] = df_FT['jet_pt'].apply(lambda x: len([j for j in x if j > 50]))
+    df_FT['njets_25'] = df_FT['jet_pt'].apply(lambda x: len([j for j in x if j > 25]))
+    df_FT['ht'] = df_FT['jet_pt'].apply(lambda x: sum(x))
+    df_FT['ht_50'] = df_FT['jet_pt'].apply(lambda x: sum([j for j in x if j > 50]))
+    df_FT['ht_8j'] = df_FT['jet_pt'].apply(lambda x: sum(x[:8]))
+    df_FT['jet_pt_0'] = df_FT['jet_pt'].apply(lambda x: x[0])
+    df_FT['jet_pt_5'] = df_FT['jet_pt'].apply(lambda x: x[5] if len(x)>5 else 0)
+    df_FT['jet_0_round'] = df_FT['jet_pt_0'].round(2)
+
+    if presel:
+        df_FT = df_FT[(df_FT.pass_HLT_ht1000_L1J100>0) & (df_FT.jet_pt_0>350) & (df_FT.ht_50>1100) & (df_FT.jet_pt_5>50) & ((df_FT.jet_pt_5/df_FT.jet_pt_0)>0.01)]
 
     cols_to_keep=[c for c in df_FT.columns if not 'jet_pt' in c]
     df_FT=df_FT[cols_to_keep]
@@ -52,7 +64,7 @@ def get_FT_df(files_FT)
 def build_and_store_df(args, files_FT):
     df_to_concat=[]
     if not args.no_input_root:
-        df_FT = get_FT_df(files_FT)
+        df_FT = get_FT_df(files_FT, args.presel)
         df_FT['has_FT'] = 1
         print('df_FT')
         print(df_FT.shape)
@@ -79,6 +91,7 @@ def build_and_store_df(args, files_FT):
     df_alpaca_noTruth=pd.read_csv(args.input_alpaca_no_truth)
     columns_reco = [c for c in df_alpaca_noTruth.columns if 'true' not in c]
     df_alpaca_noTruth = df_alpaca_noTruth[columns_reco]
+    df_alpaca_noTruth['jet_0_round'] = np.sqrt( df_alpaca_noTruth['jet_px_0']**2 + df_alpaca_noTruth['jet_py_0']**2  ).round(2)
     print('df_alpaca_noTruth')
     print(df_alpaca_noTruth.shape)
     print(df_alpaca_noTruth.columns)
@@ -102,14 +115,16 @@ def build_and_store_df(args, files_FT):
     #print(df_alpaca.describe())
     #print(df_alpaca.head())
     
-    if not args.no_input_root:
-        df = pd.merge(df_alpaca, df_FT, left_on='event_number', right_on='eventNumber', how='inner')
+    if not args.no_input_root:        
+        #df = pd.merge(df_alpaca, df_FT, left_on=['event_number','n_jets'], right_on=['eventNumber','njets'], how='inner')
+        df = pd.merge(df_alpaca, df_FT, left_on=['event_number','jet_0_round'], right_on=['eventNumber','jet_0_round'], how='inner')
+        #df = pd.merge(df_alpaca, df_FT, left_on=['event_number'], right_on=['eventNumber'], how='inner')
         print('df (alpaca + FT)')
         print(df.shape)
         print('null elements:',df.isnull().sum().sum())
         #print(df.head())
         #print(df.columns)
-        df = df.drop_duplicates(subset=['event_number'])
+        df = df.drop_duplicates(subset=['event_number','jet_0_round'])
         print('df after drop duplicates')
         print(df.shape)
         print('null elements:',df.isnull().sum().sum())
@@ -148,6 +163,8 @@ def build_tree(args):
     pass_reco_chi2_bfixed  = array('i',[0])
     pass_anatop  = array('i',[0])
     ht_8j = array('d',[0])
+    ht = array('d',[0])
+    ht_50 = array('d',[0])
     jet_pt_0 = array('d',[0])
     jet_pt_1 = array('d',[0])
     jet_pt_2 = array('d',[0])
@@ -158,7 +175,7 @@ def build_tree(args):
     jet_pt_7 = array('d',[0])
     njets = array('i',[0])
     njets_25 = array('i',[0])
-    njets_55 = array('i',[0])
+    njets_50 = array('i',[0])
 
     alpaca_good_mt1 = array('i',[0])
     alpaca_good_mt2 = array('i',[0])
@@ -195,6 +212,8 @@ def build_tree(args):
     #t_out.Branch("mt2_chi2_nobfixed",  mt2_chi2_nobfixed, "mt2_chi2_nobfixed/D")
 
     t_out.Branch("ht_8j",  ht_8j, "ht_8j/D")
+    t_out.Branch("ht",  ht, "ht/D")
+    t_out.Branch("ht_50",  ht_50, "ht_50/D")
     t_out.Branch("jet_pt_0",  jet_pt_0, "jet_pt_0/D")
     t_out.Branch("jet_pt_1",  jet_pt_1, "jet_pt_1/D")
     t_out.Branch("jet_pt_2",  jet_pt_2, "jet_pt_2/D")
@@ -206,7 +225,7 @@ def build_tree(args):
 
     t_out.Branch("njets",  njets, "njets/I")
     t_out.Branch("njets_25",  njets_25, "njets_25/I")
-    t_out.Branch("njets_55",  njets_55, "njets_55/I")
+    t_out.Branch("njets_50",  njets_50, "njets_50/I")
 
     t_out.Branch("has_truth",  has_truth, "has_truth/I")
     #t_out.Branch("pass_chi2_nobfixed",  pass_reco_chi2_nobfixed, "pass_chi2_nobfixed/I")
@@ -473,7 +492,7 @@ def build_tree(args):
 
         njets_=0
         njets_25_=0
-        njets_55_=0
+        njets_50_=0
         try:
             njets_ = int(getattr(t, 'n_jets'))
         except:
@@ -495,13 +514,23 @@ def build_tree(args):
             elif ij==7: jet_pt_7[0]=j.Pt()
             if j.Pt()>25:
                 njets_25_ += 1
-            if j.Pt()>55:
-                njets_55_ += 1
+            if j.Pt()>50:
+                njets_50_ += 1
         #print('ht:', ht_8j)
 
-        njets[0] = njets_
-        njets_25[0] =  njets_25_
-        njets_55[0] =  njets_55_
+        if not args.no_input_root:
+            ht[0] = t.ht
+            ht_50[0] = t.ht_50
+            njets_50[0] =  t.njets_50
+            njets_25[0] =  t.njets_25
+            njets[0] =  t.njets
+
+        else:
+            njets[0] = njets_
+            njets_25[0] =  njets_25_
+            njets_50[0] =  njets_50_
+            ht = -999
+            ht_50 = -999
 
         pass_reco_chi2_nobfixed[0] = -99
         pass_reco_chi2_bfixed[0] = -99
@@ -595,7 +624,7 @@ def main():
     args = options()
 
     if args.build_df:
-        df = build_and_store_df(args, files_chi2_nobfixed, files_chi2_bfixed)
+        df = build_and_store_df(args, files_FT)
         to_root(df, args.merged_df_root, key=args.output_tree)
 
     m1, m2 = build_tree(args)
