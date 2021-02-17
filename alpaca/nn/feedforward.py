@@ -8,7 +8,7 @@ class FeedForwardHead(torch.nn.Module):
         super(FeedForwardHead, self).__init__()
         self.linears = torch.nn.ModuleList([torch.nn.Linear(sizes[i-1], sizes[i]) for i in range(1, len(sizes))])
         activations = [torch.nn.ReLU() for i in range(len(sizes) - 2)]
-        activations.append(torch.nn.Sigmoid())
+        activations.append(torch.nn.Sigmoid()) # chiara: comment out and add it to loss function in core.py 
         self.activations = torch.nn.ModuleList(activations)
 
     def forward(self, x):
