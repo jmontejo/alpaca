@@ -84,7 +84,8 @@ class BatchManagerGluGlu(BatchManager):
         if not args.input_categories:
             df=df[columns_keep]
 
-        # print('input df shape', df.shape)
+        print('input df shape', df.shape)
+        print(df.columns)
 
         jets_per_event = args.jets
         zero_jets = args.zero_jets
@@ -142,7 +143,7 @@ class BatchManagerGluGlu(BatchManager):
         #print('chiara columns')
         #print(df.columns)
         #print([c for c in df.columns if c[0] not in args.spectators and (not 'alpaca' in c[0] and c[1]<n_jet_in_input)])
-        df_jets = df[[c for c in df.columns if c[0] not in args.spectators and (not 'alpaca' in c[0] and c[1]<n_jet_in_input)]]
+        df_jets = df[[c for c in df.columns if c[0] not in args.spectators and ('alpaca' not in c[0] and c[1]<n_jet_in_input)]]
         n_comp = 4 # 4 ccomponents for each jet (e, px, py, pz)
         if use_btag: n_comp += 1 # read also is_btag
         n_info_jet = n_comp if args.no_truth else n_comp+1 # if reading truth, read also parton label

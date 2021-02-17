@@ -291,7 +291,7 @@ def build_tree(args):
         if args.jets > 10:
             jet_vars.append((t.jet_px_10, t.jet_py_10, t.jet_pz_10, t.jet_e_10))
         if args.jets > 11:
-            jet_vars.append((t.jet_px_10, t.jet_py_10, t.jet_pz_10, t.jet_e_10))
+            jet_vars.append((t.jet_px_11, t.jet_py_11, t.jet_pz_11, t.jet_e_11))
 
         nj= len(jet_vars)
         if not nj == args.jets: 
