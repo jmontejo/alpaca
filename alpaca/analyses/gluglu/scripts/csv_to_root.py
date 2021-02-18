@@ -197,6 +197,17 @@ def build_tree(args):
     D_32_t2 = array('d',[0])
     m_63_ijk = array('d',[0,0])
     D2 = array('d',[0])
+    # dphi_t1_t2, dR_t1_t2, dphi_t1, dR_t1, dphi_t2, dR_t2 # sizes: 1, 1, 2, 2, 2, 2
+    dphi_t1_t2 = array('d',[0])
+    dR_t1_t2 = array('d',[0])
+    dphi_t1_min = array('d',[0])
+    dphi_t1_max = array('d',[0])
+    dR_t1_min = array('d',[0])
+    dR_t1_max = array('d',[0])
+    dphi_t2_min = array('d',[0])
+    dphi_t2_max = array('d',[0])
+    dR_t2_min = array('d',[0])
+    dR_t2_max = array('d',[0])
 
     t_out.Branch("mt1_reco",  mt1_reco, "mt1_reco/D")
     t_out.Branch("mt2_reco",  mt2_reco, "mt2_reco/D")
@@ -206,10 +217,6 @@ def build_tree(args):
     t_out.Branch("mt2_random",  mt2_random, "mt2_random/D")
     t_out.Branch("mt1_true",  mt1_true, "mt1_true/D")
     t_out.Branch("mt2_true",  mt2_true, "mt2_true/D")
-    #t_out.Branch("mt1_chi2_bfixed",  mt1_chi2_bfixed, "mt1_chi2_bfixed/D")
-    #t_out.Branch("mt2_chi2_bfixed",  mt2_chi2_bfixed, "mt2_chi2_bfixed/D")
-    #t_out.Branch("mt1_chi2_nobfixed",  mt1_chi2_nobfixed, "mt1_chi2_nobfixed/D")
-    #t_out.Branch("mt2_chi2_nobfixed",  mt2_chi2_nobfixed, "mt2_chi2_nobfixed/D")
 
     t_out.Branch("ht_8j",  ht_8j, "ht_8j/D")
     t_out.Branch("ht",  ht, "ht/D")
@@ -227,15 +234,9 @@ def build_tree(args):
     t_out.Branch("njets_25",  njets_25, "njets_25/I")
     t_out.Branch("njets_50",  njets_50, "njets_50/I")
 
-    t_out.Branch("has_truth",  has_truth, "has_truth/I")
-    #t_out.Branch("pass_chi2_nobfixed",  pass_reco_chi2_nobfixed, "pass_chi2_nobfixed/I")
-    #t_out.Branch("pass_chi2_bfixed",  pass_reco_chi2_bfixed, "pass_chi2_bfixed/I")
-    #t_out.Branch("pass_anatop",  pass_anatop, "pass_anatop/I")
-    
+    t_out.Branch("has_truth",  has_truth, "has_truth/I")    
     t_out.Branch("alpaca_good_mt1",  alpaca_good_mt1, "alpaca_good_mt1/I")
     t_out.Branch("alpaca_good_mt2",  alpaca_good_mt2, "alpaca_good_mt2/I")
-    #t_out.Branch("chi2_good_mt1",  chi2_good_mt1, "chi2_good_mt1/I")
-    #t_out.Branch("chi2_good_mt2",  chi2_good_mt2, "chi2_good_mt2/I")
 
     t_out.Branch("score_is_from_tt_1",  score_is_from_tt_1, "score_is_from_tt_1/D")
     t_out.Branch("score_is_from_tt_2",  score_is_from_tt_2, "score_is_from_tt_2/D")
@@ -243,12 +244,25 @@ def build_tree(args):
     t_out.Branch("score_same_as_lead_2",  score_same_as_lead_2, "score_same_as_lead_2/D")
     t_out.Branch("score_sum",  score_sum, "score_sum/D")
 
+    # dalitz variables
     t_out.Branch("m_32_t1",  m_32_t1, "m_32_t1[3]/D")
     t_out.Branch("m_32_t2",  m_32_t2, "m_32_t2[3]/D")
     t_out.Branch("D_32_t1",  D_32_t1, "D_32_t1/D")
     t_out.Branch("D_32_t2",  D_32_t2, "D_32_t2/D")
     t_out.Branch("m_63_ijk",  m_63_ijk, "m_63_ijk[2]/D")
     t_out.Branch("D2",  D2, "D2/D")
+
+    # angular variables
+    t_out.Branch("dphi_t1_t2", dphi_t1_t2, "dphi_t1_t2/D")
+    t_out.Branch("dR_t1_t2", dR_t1_t2 , "dR_t1_t2/D")
+    t_out.Branch("dphi_t1_min", dphi_t1_min , "dphi_t1_min/D")
+    t_out.Branch("dphi_t1_max", dphi_t1_max , "dphi_t1_max/D")
+    t_out.Branch("dR_t1_min", dR_t1_min , "dR_t1_min/D")
+    t_out.Branch("dR_t1_max", dR_t1_max , "dR_t1_max/D")
+    t_out.Branch("dphi_t2_min", dphi_t2_min , "dphi_t2_min/D")
+    t_out.Branch("dphi_t2_max", dphi_t2_max , "dphi_t2_max/D")
+    t_out.Branch("dR_t2_min", dR_t2_min , "dR_t2_min/D")
+    t_out.Branch("dR_t2_max", dR_t2_max , "dR_t2_max/D")
 
     t_out.Branch("weight",  wei, "weight/D")
 
@@ -375,6 +389,29 @@ def build_tree(args):
             #print('')
             return m_32_t1, m_32_t2, D_32_t1, D_32_t2, m_63_ijk, D2 # 3, 3, 1, 1, 2, 1
 
+        def min_max_angular_in_t(t_list, deltaR=False):
+            pairs = list(itertools.combinations(range(3), 2))
+            min_d = 9999
+            max_d = 0 
+            for p in pairs:
+                qi = t_list[p[0]]
+                qj = t_list[p[1]]
+                if deltaR: d = qi.DeltaR(qj)
+                else: d = qi.DeltaPhi(qj)
+                if d > max_d: max_d = d
+                if d < min_d: min_d = d
+            return (min_d, max_d)
+
+        def form_angular_var(t1_list,t2_list):
+            t1 = t1_list[0] + t1_list[1] + t1_list[2]
+            t2 = t2_list[0] + t2_list[1] + t2_list[2]
+            dphi_t1_t2 = t1.DeltaPhi(t2)
+            dR_t1_t2 = t1.DeltaR(t2)
+            dphi_t1 = min_max_angular_in_t(t1_list, deltaR=False)
+            dR_t1 = min_max_angular_in_t(t1_list, deltaR=True)
+            dphi_t2 = min_max_angular_in_t(t2_list, deltaR=False)
+            dR_t2 = min_max_angular_in_t(t2_list, deltaR=True)
+            return dphi_t1_t2, dR_t1_t2, dphi_t1, dR_t1, dphi_t2, dR_t2 # sizes: 1, 1, 2, 2, 2, 2
 
         def form_tops(jets_all, from_top, same_as_lead,  is_b, njets):
             #print('Number of jets:', len(jets_all))
@@ -457,9 +494,10 @@ def build_tree(args):
                     t1_list,t2_list = t2_list,t1_list # change lists as well
             # dalitz variables 
             dalitz_var = form_dalitz(t1_list,t2_list) # lenght of variables: 3, 3, 1, 1, 2, 1
-            return t1, t2, (is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score), dalitz_var
+            angular = form_angular_var(t1_list,t2_list)
+            return t1, t2, (is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score), dalitz_var, angluar
 
-        t1, t2, scores, dalitz = form_tops(jets_all, from_top, same_as_lead,  is_b, args.jets)
+        t1, t2, scores, dalitz, angular = form_tops(jets_all, from_top, same_as_lead,  is_b, args.jets)
         mt1_reco[0] = t1.M()
         mt2_reco[0] = t2.M()
         pt1_reco[0] = t1.Pt()
@@ -475,18 +513,28 @@ def build_tree(args):
         m_32_t1[0] = dalitz[0][0]
         m_32_t1[1] = dalitz[0][1]
         m_32_t1[2] = dalitz[0][2]
-
         m_32_t2[0] = dalitz[1][0]
         m_32_t2[1] = dalitz[1][1]
         m_32_t2[2] = dalitz[1][2]
-
         D_32_t1[0] = dalitz[2]
         D_32_t2[0] = dalitz[3]
         m_63_ijk[0] = dalitz[4][0]
         m_63_ijk[1] = dalitz[4][1]
         D2[0] = dalitz[5]
+        
+        # dphi_t1_t2, dR_t1_t2, dphi_t1, dR_t1, dphi_t2, dR_t2 # sizes: 1, 1, 2, 2, 2, 2
+        dphi_t1_t2[0] = angular[0]
+        dR_t1_t2[0] = angular[1]
+        dphi_t1_min[0] = angular[2][0]
+        dphi_t1_max[0] = angular[2][1]
+        dR_t1_min[0] = angular[3][0]
+        dR_t1_max[0] = angular[3][1]
+        dphi_t2_min[0] = angular[4][0]
+        dphi_t2_max[0] = angular[4][1]
+        dR_t2_min[0] = angular[5][0]
+        dR_t2_max[0] = angular[5][1]
 
-        t1_random, t2_random, scores_random, dalitz_random = form_tops(jets_all, from_top_random, same_as_lead_random,  is_b_random, args.jets)
+        t1_random, t2_random, scores_random, dalitz_random, angular_random = form_tops(jets_all, from_top_random, same_as_lead_random,  is_b_random, args.jets)
         mt1_random[0] = t1_random.M()
         mt2_random[0] = t2_random.M()
 
