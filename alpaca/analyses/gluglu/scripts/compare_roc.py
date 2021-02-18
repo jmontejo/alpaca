@@ -13,14 +13,15 @@ import sys
 eos='/eos/user/c/crizzi/RPV/alpaca/results/'
 csvname='NNoutput_test.csv'
 models=['alpaca_sigbkg_12j_colalola_3layers_UDS_1400',
-        'alpaca_sigbkg_12j_colalola_3layers_UDBUDS_1400']
+        'alpaca_sigbkg_12j_colalola_3layers_UDBUDS_1400',
+        'alpaca_sigbkg_12j_colalola_3layers_UDBUDS_1400_weight10',
+        'alpaca_sigbkg_12j_colalola_3layers_UDBUDS_1400_lessQCD']
 labels = [l.replace('alpaca_sigbkg_12j_colalola_3layers_','').replace('_',' ') for l in models]
 csv_list = [eos+'/'+m+'/'+csvname for m in models]
 coly='tagged_true'
 colp='tagged'
 name_can = 'roc_comp_log'
 colors=['darkorange','dodgerblue','hotpink','forestgreen', 'navy', 'gold']
-show_rejection = True
 
 fig = plt.figure()
 
@@ -43,6 +44,7 @@ plt.ylabel('QCD Rejection')
 plt.xlabel('Signal Efficiency')
 #plt.xscale('log')
 plt.yscale('log')
+plt.grid(which='both', axis='both')
 #plt.title('Receiver operating characteristic')
 plt.legend(loc="upper right")
 plt.savefig(name_can+'.png')
