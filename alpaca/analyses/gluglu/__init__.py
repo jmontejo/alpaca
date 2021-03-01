@@ -6,7 +6,6 @@ import numpy as np
 from alpaca.core import BaseMain
 from alpaca.batch import BatchManager
 
-use_btag=False # chiara: put as cli argument
 n_jet_in_input=20 # chiara: can compute this from column names
 
 log = logging.getLogger(__name__)
@@ -49,8 +48,9 @@ class MainGluGlu(BaseMain):
         _Y = Y.data.numpy()
         _X = X.data.numpy()
         jet_vars = ['jet_px','jet_py','jet_pz','jet_e']
-        if use_btag:
-            jet_vars.append('jet_isDL177')
+        extra_fileds = set(args.extra_jet_fields)
+        for extra in extra_fileds:
+            jet_vars.append(extra)
         col_X = [j+'_'+str(i) for i in range(self.args.jets) for j in jet_vars]
         df_X = pd.DataFrame(data = _X, columns=col_X)
         if len(torch_batch) > 2:
@@ -144,8 +144,7 @@ class BatchManagerGluGlu(BatchManager):
         #print(df.columns)
         #print([c for c in df.columns if c[0] not in args.spectators and (not 'alpaca' in c[0] and c[1]<n_jet_in_input)])
         df_jets = df[[c for c in df.columns if c[0] not in args.spectators and ('alpaca' not in c[0] and c[1]<n_jet_in_input)]]
-        n_comp = 4 # 4 ccomponents for each jet (e, px, py, pz)
-        if use_btag: n_comp += 1 # read also is_btag
+        n_comp = 4 + len(extra_fileds) # 4 ccomponents for each jet (e, px, py, pz) plus the extra components        
         n_info_jet = n_comp if args.no_truth else n_comp+1 # if reading truth, read also parton label
         jet_stack = np.swapaxes(df_jets.values.reshape(len(df_jets), n_info_jet, n_jet_in_input), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
@@ -155,14 +154,13 @@ class BatchManagerGluGlu(BatchManager):
         jet_px = jet_stack[:, :, 1]
         jet_py = jet_stack[:, :, 2]
         jet_pz = jet_stack[:, :, 3]
-        if use_btag:
-            jet_btag = jet_stack[:, :, 4]
+        
         jet_stack[:, :, 0] = jet_px
         jet_stack[:, :, 1] = jet_py
         jet_stack[:, :, 2] = jet_pz
         jet_stack[:, :, 3] = jet_e
-        if use_btag:
-            jet_stack[:, :, 4] = jet_btag
+        for i in range(len(extra_fileds)):
+            jet_stack[:, :, 4+i] = jet_stack[:, :, 4+i]
 
         #jet_stack_pt = np.sqrt(jet_stack[:, :, 0]**2+jet_stack[:, :, 1]**2)
         #jet_stack_eta = np.arcsinh(jet_stack[:, :, 2]/np.maximum(jet_stack_pt,np.ones(jet_stack[:, :,0].shape)))
