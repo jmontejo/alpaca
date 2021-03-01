@@ -48,8 +48,8 @@ class MainGluGlu(BaseMain):
         _Y = Y.data.numpy()
         _X = X.data.numpy()
         jet_vars = ['jet_px','jet_py','jet_pz','jet_e']
-        extra_fileds = set(args.extra_jet_fields)
-        for extra in extra_fileds:
+        extra_fields = set(self.args.extra_jet_fields)
+        for extra in extra_fields:
             jet_vars.append(extra)
         col_X = [j+'_'+str(i) for i in range(self.args.jets) for j in jet_vars]
         df_X = pd.DataFrame(data = _X, columns=col_X)
@@ -60,6 +60,12 @@ class MainGluGlu(BaseMain):
             col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
         else:
             col_P = ['tagged']
+        print("Y")
+        print(Y)
+        print(Y.shape)
+        print(col_P)
+        print(len(col_P))
+        print(_P.shape)
         df_P = pd.DataFrame(data = _P, columns=col_P)
 
         if self.args.no_truth:
@@ -140,11 +146,12 @@ class BatchManagerGluGlu(BatchManager):
                 spectators.append(df[s][0]) 
             else:
                 spectators.append(np.zeros(len(df)))
+        extra_fields = set(args.extra_jet_fields)
         #print('chiara columns')
         #print(df.columns)
         #print([c for c in df.columns if c[0] not in args.spectators and (not 'alpaca' in c[0] and c[1]<n_jet_in_input)])
         df_jets = df[[c for c in df.columns if c[0] not in args.spectators and ('alpaca' not in c[0] and c[1]<n_jet_in_input)]]
-        n_comp = 4 + len(extra_fileds) # 4 ccomponents for each jet (e, px, py, pz) plus the extra components        
+        n_comp = 4 + len(extra_fields) # 4 ccomponents for each jet (e, px, py, pz) plus the extra components        
         n_info_jet = n_comp if args.no_truth else n_comp+1 # if reading truth, read also parton label
         jet_stack = np.swapaxes(df_jets.values.reshape(len(df_jets), n_info_jet, n_jet_in_input), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
@@ -159,7 +166,7 @@ class BatchManagerGluGlu(BatchManager):
         jet_stack[:, :, 1] = jet_py
         jet_stack[:, :, 2] = jet_pz
         jet_stack[:, :, 3] = jet_e
-        for i in range(len(extra_fileds)):
+        for i in range(len(extra_fields)):
             jet_stack[:, :, 4+i] = jet_stack[:, :, 4+i]
 
         #jet_stack_pt = np.sqrt(jet_stack[:, :, 0]**2+jet_stack[:, :, 1]**2)
@@ -209,10 +216,16 @@ class BatchManagerGluGlu(BatchManager):
             # Account for charge ambiguity by identifying whether the
             # jets match the leading jet or not
             maskedlabels = np.ma.masked_where(jetfromttbar == False, labels)
-            nonisrlabels = np.array([r.compressed() for r in maskedlabels])
+            nonisrlabels = [r.compressed() for r in maskedlabels]
+            # chiara: not ideal, find a better way! 
+            for ia,a in enumerate(list(nonisrlabels)):
+                if not a.shape[0] == 6:
+                    nonisrlabels[ia] = np.append(nonisrlabels[ia], [0 for i in range(6-a.shape[0])] )
+            nonisrlabels = np.array(nonisrlabels)
             topmatch = np.array([r > 3 if r[0] > 3 else r <= 3 for r in nonisrlabels])
             isbjet = np.array([np.equal(r, 1) | np.equal(r, 4) for r in nonisrlabels])
             jetlabels = np.concatenate([jetfromttbar, topmatch[:, 1:], isbjet], 1)
+
             # Substitute this line for the preceding if only doing the 6 top jets
             # Not currently configurable by command line because it's a bit more
             # complicated overall + less often changed
@@ -249,7 +262,7 @@ class BatchManagerGluGlu(BatchManager):
             return jets_clean,None,None, jetlabels_clean, spectators_formatted_clean
 
         else:
-            jetlabels = np.zeros((jets.shape[0], 1))
+            jetlabels = np.zeros((jets.shape[0], 2))
             spectators_formatted = np.vstack(spectators).T if(len(args.spectators)>0) else None
             return jets,None,None, jetlabels, spectators_formatted
  
