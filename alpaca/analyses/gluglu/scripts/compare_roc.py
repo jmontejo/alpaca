@@ -15,8 +15,9 @@ csvname='NNoutput_test.csv'
 models=['alpaca_sigbkg_12j_colalola_3layers_UDS_1400',
         'alpaca_sigbkg_12j_colalola_3layers_UDBUDS_1400',
         'alpaca_sigbkg_12j_colalola_3layers_UDBUDS_1400_weight10',
-        'alpaca_sigbkg_12j_colalola_3layers_UDBUDS_1400_lessQCD']
-labels = [l.replace('alpaca_sigbkg_12j_colalola_3layers_','').replace('_',' ') for l in models]
+        'alpaca_sigbkg_12j_colalola_3layers_UDBUDS_1400_lessQCD',
+        'alpaca_sigbkg_12j_simpleNN_3layers_UDBUDS_1400']
+labels = [l.replace('alpaca_sigbkg_12j_colalola_3layers_','').replace('alpaca_sigbkg_12j_','').replace('_3layers','').replace('_',' ') for l in models]
 csv_list = [eos+'/'+m+'/'+csvname for m in models]
 coly='tagged_true'
 colp='tagged'

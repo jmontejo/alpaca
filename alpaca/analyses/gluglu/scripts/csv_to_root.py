@@ -29,12 +29,11 @@ def options():
     parser.add_argument('--presel',   action='store_true',        help="Apply preselection")
     return parser.parse_args()
 
-files_FT=['/eos/user/c/crizzi/RPV/ntuples/FT_merged_skim/qcd.root']
-#files_FT=['/eos/user/c/crizzi/RPV/ntuples/FT_signal_020321_merged/mc16e/signal/504539.root']
 def get_FT_df(files_FT, presel=False):
     df_FT_list=[]
     print('Loading ROOT files')
     for f in  progressbar.progressbar(files_FT):
+        print(f)
         tname_FT = 'trees_SRRPV_'
         f_FT = uproot.open(f)
         t_FT = f_FT[tname_FT]
@@ -209,6 +208,9 @@ def build_tree(args):
     dR_t2_min = array('d',[0])
     dR_t2_max = array('d',[0])
 
+    dphi_min_j31_j32 = array('d',[0])
+    dR_min_j31_j32 = array('d',[0])
+
     t_out.Branch("mt1_reco",  mt1_reco, "mt1_reco/D")
     t_out.Branch("mt2_reco",  mt2_reco, "mt2_reco/D")
     t_out.Branch("pt1_reco",  pt1_reco, "pt1_reco/D")
@@ -252,7 +254,7 @@ def build_tree(args):
     t_out.Branch("m_63_ijk",  m_63_ijk, "m_63_ijk[2]/D")
     t_out.Branch("D2",  D2, "D2/D")
 
-    # angular variables
+    # angular variables gluino system
     t_out.Branch("dphi_t1_t2", dphi_t1_t2, "dphi_t1_t2/D")
     t_out.Branch("dR_t1_t2", dR_t1_t2 , "dR_t1_t2/D")
     t_out.Branch("dphi_t1_min", dphi_t1_min , "dphi_t1_min/D")
@@ -263,6 +265,10 @@ def build_tree(args):
     t_out.Branch("dphi_t2_max", dphi_t2_max , "dphi_t2_max/D")
     t_out.Branch("dR_t2_min", dR_t2_min , "dR_t2_min/D")
     t_out.Branch("dR_t2_max", dR_t2_max , "dR_t2_max/D")
+
+    # angular variables event
+    t_out.Branch("dphi_min_j31_j32", dphi_min_j31_j32, "dphi_min_j31_j32/D")
+    t_out.Branch("dR_min_j31_j32", dR_min_j31_j32, "dR_min_j31_j32/D")
 
     t_out.Branch("weight",  wei, "weight/D")
 
@@ -397,7 +403,7 @@ def build_tree(args):
                 qi = t_list[p[0]]
                 qj = t_list[p[1]]
                 if deltaR: d = qi.DeltaR(qj)
-                else: d = qi.DeltaPhi(qj)
+                else: d = np.abs(qi.DeltaPhi(qj))
                 if d > max_d: max_d = d
                 if d < min_d: min_d = d
             return (min_d, max_d)
@@ -405,7 +411,7 @@ def build_tree(args):
         def form_angular_var(t1_list,t2_list):
             t1 = t1_list[0] + t1_list[1] + t1_list[2]
             t2 = t2_list[0] + t2_list[1] + t2_list[2]
-            dphi_t1_t2 = t1.DeltaPhi(t2)
+            dphi_t1_t2 = np.abs(t1.DeltaPhi(t2))
             dR_t1_t2 = t1.DeltaR(t2)
             dphi_t1 = min_max_angular_in_t(t1_list, deltaR=False)
             dR_t1 = min_max_angular_in_t(t1_list, deltaR=True)
@@ -495,7 +501,7 @@ def build_tree(args):
             # dalitz variables 
             dalitz_var = form_dalitz(t1_list,t2_list) # lenght of variables: 3, 3, 1, 1, 2, 1
             angular = form_angular_var(t1_list,t2_list)
-            return t1, t2, (is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score), dalitz_var, angluar
+            return t1, t2, (is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score), dalitz_var, angular
 
         t1, t2, scores, dalitz, angular = form_tops(jets_all, from_top, same_as_lead,  is_b, args.jets)
         mt1_reco[0] = t1.M()
@@ -549,6 +555,10 @@ def build_tree(args):
                     njets_ += 1
         #print('computing HT')
         ht_8j[0] = 0
+
+        dphi_min_j31_j32[0] = np.min( [np.abs(jets_all[2].DeltaPhi(jets_all[0])), np.abs(jets_all[2].DeltaPhi(jets_all[1]))]  )
+        dR_min_j31_j32[0] = np.min( [np.abs(jets_all[2].DeltaR(jets_all[0])), np.abs(jets_all[2].DeltaR(jets_all[1]))]  )
+
         for ij,j in enumerate(jets_all):
             ht_8j[0] += j.Pt()
             #print('  adding:', j.Pt())
@@ -670,6 +680,11 @@ def build_tree(args):
 
 def main():
     args = options()
+
+    if 'dijet' in args.input_alpaca_truth:
+        files_FT=['/eos/user/c/crizzi/RPV/ntuples/FT_merged_skim/qcd.root']
+    else:
+        files_FT=['/eos/user/c/crizzi/RPV/ntuples/FT_signal_020321_merged/mc16e/signal/504539.root']
 
     if args.build_df:
         df = build_and_store_df(args, files_FT)
