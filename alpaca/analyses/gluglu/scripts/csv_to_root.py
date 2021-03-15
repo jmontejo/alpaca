@@ -149,12 +149,15 @@ def build_tree(args):
     pg2_reco  = array('d',[0])
     mg1_reco  = array('d',[0])
     mg2_reco  = array('d',[0])
+    mg1g2_reco  = array('d',[0])
     mg1_true  = array('d',[0])
     mg1_random  = array('d',[0])
     mg1_chi2_bfixed  = array('d',[0])
     mg1_chi2_nobfixed  = array('d',[0])
     mg2_random  = array('d',[0])
+    mg1g2_random  = array('d',[0])
     mg2_true  = array('d',[0])
+    mg1g2_true  = array('d',[0])
     mg2_chi2_bfixed  = array('d',[0])
     mg2_chi2_nobfixed  = array('d',[0])
     has_truth  = array('i',[0])
@@ -178,6 +181,7 @@ def build_tree(args):
 
     alpaca_good_mg1 = array('i',[0])
     alpaca_good_mg2 = array('i',[0])
+    alpaca_good_mg1g2 = array('i',[0])
     chi2_good_mg1 = array('i',[0])
     chi2_good_mg2 = array('i',[0])
 
@@ -213,12 +217,15 @@ def build_tree(args):
 
     t_out.Branch("mg1_reco",  mg1_reco, "mg1_reco/D")
     t_out.Branch("mg2_reco",  mg2_reco, "mg2_reco/D")
+    t_out.Branch("mg1g2_reco",  mg1g2_reco, "mg1g2_reco/D")
     t_out.Branch("pg1_reco",  pg1_reco, "pg1_reco/D")
     t_out.Branch("pg2_reco",  pg2_reco, "pg2_reco/D")
     t_out.Branch("mg1_random",  mg1_random, "mg1_random/D")
     t_out.Branch("mg2_random",  mg2_random, "mg2_random/D")
+    t_out.Branch("mg1g2_random",  mg1g2_random, "mg1g2_random/D")
     t_out.Branch("mg1_true",  mg1_true, "mg1_true/D")
     t_out.Branch("mg2_true",  mg2_true, "mg2_true/D")
+    t_out.Branch("mg1g2_true",  mg1g2_true, "mg1g2_true/D")
 
     t_out.Branch("ht_8j",  ht_8j, "ht_8j/D")
     t_out.Branch("ht",  ht, "ht/D")
@@ -239,6 +246,7 @@ def build_tree(args):
     t_out.Branch("has_truth",  has_truth, "has_truth/I")    
     t_out.Branch("alpaca_good_mg1",  alpaca_good_mg1, "alpaca_good_mg1/I")
     t_out.Branch("alpaca_good_mg2",  alpaca_good_mg2, "alpaca_good_mg2/I")
+    t_out.Branch("alpaca_good_mg1g2",  alpaca_good_mg1g2, "alpaca_good_mg1g2/I")
 
     t_out.Branch("score_is_from_tt_1",  score_is_from_tt_1, "score_is_from_tt_1/D")
     t_out.Branch("score_is_from_tt_2",  score_is_from_tt_2, "score_is_from_tt_2/D")
@@ -506,6 +514,7 @@ def build_tree(args):
         g1, g2, scores, dalitz, angular = form_tops(jets_all, from_top, same_as_lead,  is_b, args.jets)
         mg1_reco[0] = g1.M()
         mg2_reco[0] = g2.M()
+        mg1g2_reco[0] = (g1+g2).M()
         pg1_reco[0] = g1.Pt()
         pg2_reco[0] = g2.Pt()
         
@@ -543,6 +552,7 @@ def build_tree(args):
         g1_random, g2_random, scores_random, dalitz_random, angular_random = form_tops(jets_all, from_top_random, same_as_lead_random,  is_b_random, args.jets)
         mg1_random[0] = g1_random.M()
         mg2_random[0] = g2_random.M()
+        mg1g2_random[0] = (g1_random + g2_random).M()
 
         njets_=0
         njets_25_=0
@@ -641,9 +651,11 @@ def build_tree(args):
                 if g2_true.Pt() > g1_true.Pt(): g1_true,g2_true=g2_true,g1_true          
             mg1_true[0] = g1_true.M()
             mg2_true[0] = g2_true.M()
+            mg1g2_true[0] = (g1_true + g2_true).M()
         
             alpaca_good_mg1[0] = (round(mg1_true[0],2) == round(mg1_reco[0],2)) or (round(mg2_true[0],2) == round(mg1_reco[0],2))
             alpaca_good_mg2[0] = (round(mg2_true[0],2) == round(mg2_reco[0],2)) or  (round(mg1_true[0],2) == round(mg2_reco[0],2))
+            alpaca_good_mg1g2[0] = (round(mg1g2_true[0],2) == round(mg1g2_reco[0],2))
             
             '''
             if t.has_chi2:
@@ -659,6 +671,7 @@ def build_tree(args):
             mg2_true[0] = -99
             alpaca_good_mg1[0] = -99
             alpaca_good_mg2[0] = -99
+            alpaca_good_mg1g2[0] = -99
             chi2_good_mg1[0] = -99
             chi2_good_mg2[0] = -99            
 
