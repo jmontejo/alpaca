@@ -5,8 +5,15 @@ ntype='hydra'
 by_jet = False
 list_max_jet = [6,7,8,9,10,11,12]
 
-by_mass = True
+by_mass = False
 list_masses=[900,1400,2400]
+
+by_file = True
+files = [
+    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_onlyBaseline/outputtree_test.root',
+    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_isSig/outputtree_test.root',
+    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_isSig_isGluon/outputtree_test.root'
+]
 
 def print_eff(tree, jet_sel,max_jet):
     for j in jet_sel:
@@ -56,3 +63,11 @@ if by_mass:
         #jet_sel = ['njets=='+str(ij) for ij in range(6,max_jet)] + ['njets>='+str(max_jet),'njets>=5']
         jet_sel = ['njets>=5']    
         print_eff(tree, jet_sel,m)
+
+if by_file:
+    for ifile,infile_name in enumerate(files):
+        infile = ROOT.TFile.Open(infile_name,"READ")
+        tree = infile.Get("tree")    
+        #jet_sel = ['njets=='+str(ij) for ij in range(6,max_jet)] + ['njets>='+str(max_jet),'njets>=5']
+        jet_sel = ['njets>=5']    
+        print_eff(tree, jet_sel,ifile)

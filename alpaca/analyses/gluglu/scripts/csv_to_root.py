@@ -145,18 +145,18 @@ def build_tree(args):
     f_out = ROOT.TFile.Open(args.output,'RECREATE')
     t_out = ROOT.TTree(args.output_tree, args.output_tree)
 
-    pt1_reco  = array('d',[0])
-    pt2_reco  = array('d',[0])
-    mt1_reco  = array('d',[0])
-    mt2_reco  = array('d',[0])
-    mt1_true  = array('d',[0])
-    mt1_random  = array('d',[0])
-    mt1_chi2_bfixed  = array('d',[0])
-    mt1_chi2_nobfixed  = array('d',[0])
-    mt2_random  = array('d',[0])
-    mt2_true  = array('d',[0])
-    mt2_chi2_bfixed  = array('d',[0])
-    mt2_chi2_nobfixed  = array('d',[0])
+    pg1_reco  = array('d',[0])
+    pg2_reco  = array('d',[0])
+    mg1_reco  = array('d',[0])
+    mg2_reco  = array('d',[0])
+    mg1_true  = array('d',[0])
+    mg1_random  = array('d',[0])
+    mg1_chi2_bfixed  = array('d',[0])
+    mg1_chi2_nobfixed  = array('d',[0])
+    mg2_random  = array('d',[0])
+    mg2_true  = array('d',[0])
+    mg2_chi2_bfixed  = array('d',[0])
+    mg2_chi2_nobfixed  = array('d',[0])
     has_truth  = array('i',[0])
     pass_reco_chi2_nobfixed  = array('i',[0])
     pass_reco_chi2_bfixed  = array('i',[0])
@@ -176,10 +176,10 @@ def build_tree(args):
     njets_25 = array('i',[0])
     njets_50 = array('i',[0])
 
-    alpaca_good_mt1 = array('i',[0])
-    alpaca_good_mt2 = array('i',[0])
-    chi2_good_mt1 = array('i',[0])
-    chi2_good_mt2 = array('i',[0])
+    alpaca_good_mg1 = array('i',[0])
+    alpaca_good_mg2 = array('i',[0])
+    chi2_good_mg1 = array('i',[0])
+    chi2_good_mg2 = array('i',[0])
 
     score_is_from_tt_1 = array('d',[0])
     score_is_from_tt_2 = array('d',[0])
@@ -189,36 +189,36 @@ def build_tree(args):
 
     wei  = array('d',[0])
 
-    #m_32_t1, m_32_t2, D_32_t1, D_32_t2, m_63_ijk, D2 # 3, 3, 1, 1, 2, 1
-    m_32_t1 = array('d',[0,0,0])
-    m_32_t2 = array('d',[0,0,0])
-    D_32_t1 = array('d',[0])
-    D_32_t2 = array('d',[0])
+    #m_32_g1, m_32_g2, D_32_g1, D_32_g2, m_63_ijk, D2 # 3, 3, 1, 1, 2, 1
+    m_32_g1 = array('d',[0,0,0])
+    m_32_g2 = array('d',[0,0,0])
+    D_32_g1 = array('d',[0])
+    D_32_g2 = array('d',[0])
     m_63_ijk = array('d',[0,0])
     D2 = array('d',[0])
-    # dphi_t1_t2, dR_t1_t2, dphi_t1, dR_t1, dphi_t2, dR_t2 # sizes: 1, 1, 2, 2, 2, 2
-    dphi_t1_t2 = array('d',[0])
-    dR_t1_t2 = array('d',[0])
-    dphi_t1_min = array('d',[0])
-    dphi_t1_max = array('d',[0])
-    dR_t1_min = array('d',[0])
-    dR_t1_max = array('d',[0])
-    dphi_t2_min = array('d',[0])
-    dphi_t2_max = array('d',[0])
-    dR_t2_min = array('d',[0])
-    dR_t2_max = array('d',[0])
+    # dphi_g1_g2, dR_g1_g2, dphi_g1, dR_g1, dphi_g2, dR_g2 # sizes: 1, 1, 2, 2, 2, 2
+    dphi_g1_g2 = array('d',[0])
+    dR_g1_g2 = array('d',[0])
+    dphi_g1_min = array('d',[0])
+    dphi_g1_max = array('d',[0])
+    dR_g1_min = array('d',[0])
+    dR_g1_max = array('d',[0])
+    dphi_g2_min = array('d',[0])
+    dphi_g2_max = array('d',[0])
+    dR_g2_min = array('d',[0])
+    dR_g2_max = array('d',[0])
 
     dphi_min_j31_j32 = array('d',[0])
     dR_min_j31_j32 = array('d',[0])
 
-    t_out.Branch("mt1_reco",  mt1_reco, "mt1_reco/D")
-    t_out.Branch("mt2_reco",  mt2_reco, "mt2_reco/D")
-    t_out.Branch("pt1_reco",  pt1_reco, "pt1_reco/D")
-    t_out.Branch("pt2_reco",  pt2_reco, "pt2_reco/D")
-    t_out.Branch("mt1_random",  mt1_random, "mt1_random/D")
-    t_out.Branch("mt2_random",  mt2_random, "mt2_random/D")
-    t_out.Branch("mt1_true",  mt1_true, "mt1_true/D")
-    t_out.Branch("mt2_true",  mt2_true, "mt2_true/D")
+    t_out.Branch("mg1_reco",  mg1_reco, "mg1_reco/D")
+    t_out.Branch("mg2_reco",  mg2_reco, "mg2_reco/D")
+    t_out.Branch("pg1_reco",  pg1_reco, "pg1_reco/D")
+    t_out.Branch("pg2_reco",  pg2_reco, "pg2_reco/D")
+    t_out.Branch("mg1_random",  mg1_random, "mg1_random/D")
+    t_out.Branch("mg2_random",  mg2_random, "mg2_random/D")
+    t_out.Branch("mg1_true",  mg1_true, "mg1_true/D")
+    t_out.Branch("mg2_true",  mg2_true, "mg2_true/D")
 
     t_out.Branch("ht_8j",  ht_8j, "ht_8j/D")
     t_out.Branch("ht",  ht, "ht/D")
@@ -237,8 +237,8 @@ def build_tree(args):
     t_out.Branch("njets_50",  njets_50, "njets_50/I")
 
     t_out.Branch("has_truth",  has_truth, "has_truth/I")    
-    t_out.Branch("alpaca_good_mt1",  alpaca_good_mt1, "alpaca_good_mt1/I")
-    t_out.Branch("alpaca_good_mt2",  alpaca_good_mt2, "alpaca_good_mt2/I")
+    t_out.Branch("alpaca_good_mg1",  alpaca_good_mg1, "alpaca_good_mg1/I")
+    t_out.Branch("alpaca_good_mg2",  alpaca_good_mg2, "alpaca_good_mg2/I")
 
     t_out.Branch("score_is_from_tt_1",  score_is_from_tt_1, "score_is_from_tt_1/D")
     t_out.Branch("score_is_from_tt_2",  score_is_from_tt_2, "score_is_from_tt_2/D")
@@ -247,24 +247,24 @@ def build_tree(args):
     t_out.Branch("score_sum",  score_sum, "score_sum/D")
 
     # dalitz variables
-    t_out.Branch("m_32_t1",  m_32_t1, "m_32_t1[3]/D")
-    t_out.Branch("m_32_t2",  m_32_t2, "m_32_t2[3]/D")
-    t_out.Branch("D_32_t1",  D_32_t1, "D_32_t1/D")
-    t_out.Branch("D_32_t2",  D_32_t2, "D_32_t2/D")
+    t_out.Branch("m_32_g1",  m_32_g1, "m_32_g1[3]/D")
+    t_out.Branch("m_32_g2",  m_32_g2, "m_32_g2[3]/D")
+    t_out.Branch("D_32_g1",  D_32_g1, "D_32_g1/D")
+    t_out.Branch("D_32_g2",  D_32_g2, "D_32_g2/D")
     t_out.Branch("m_63_ijk",  m_63_ijk, "m_63_ijk[2]/D")
     t_out.Branch("D2",  D2, "D2/D")
 
     # angular variables gluino system
-    t_out.Branch("dphi_t1_t2", dphi_t1_t2, "dphi_t1_t2/D")
-    t_out.Branch("dR_t1_t2", dR_t1_t2 , "dR_t1_t2/D")
-    t_out.Branch("dphi_t1_min", dphi_t1_min , "dphi_t1_min/D")
-    t_out.Branch("dphi_t1_max", dphi_t1_max , "dphi_t1_max/D")
-    t_out.Branch("dR_t1_min", dR_t1_min , "dR_t1_min/D")
-    t_out.Branch("dR_t1_max", dR_t1_max , "dR_t1_max/D")
-    t_out.Branch("dphi_t2_min", dphi_t2_min , "dphi_t2_min/D")
-    t_out.Branch("dphi_t2_max", dphi_t2_max , "dphi_t2_max/D")
-    t_out.Branch("dR_t2_min", dR_t2_min , "dR_t2_min/D")
-    t_out.Branch("dR_t2_max", dR_t2_max , "dR_t2_max/D")
+    t_out.Branch("dphi_g1_g2", dphi_g1_g2, "dphi_g1_g2/D")
+    t_out.Branch("dR_g1_g2", dR_g1_g2 , "dR_g1_g2/D")
+    t_out.Branch("dphi_g1_min", dphi_g1_min , "dphi_g1_min/D")
+    t_out.Branch("dphi_g1_max", dphi_g1_max , "dphi_g1_max/D")
+    t_out.Branch("dR_g1_min", dR_g1_min , "dR_g1_min/D")
+    t_out.Branch("dR_g1_max", dR_g1_max , "dR_g1_max/D")
+    t_out.Branch("dphi_g2_min", dphi_g2_min , "dphi_g2_min/D")
+    t_out.Branch("dphi_g2_max", dphi_g2_max , "dphi_g2_max/D")
+    t_out.Branch("dR_g2_min", dR_g2_min , "dR_g2_min/D")
+    t_out.Branch("dR_g2_max", dR_g2_max , "dR_g2_max/D")
 
     # angular variables event
     t_out.Branch("dphi_min_j31_j32", dphi_min_j31_j32, "dphi_min_j31_j32/D")
@@ -367,33 +367,33 @@ def build_tree(args):
             # sqrt since now we have the square
             return np.sqrt(m_32)
 
-        def form_m_63_ijk(t1_list, t2_list):
-            t1 = t1_list[0] + t1_list[1] + t1_list[2]
-            t2 = t2_list[0] + t2_list[1] + t2_list[2]
-            t1t2 = t1 + t2
-            den = 4*(t1t2.M()**2) + 6*np.sum([q.M()**2 for q in t1_list+t2_list])
-            m_63_2 = [(t1.M()**2)/den, (t2.M()**2)/den]
+        def form_m_63_ijk(g1_list, g2_list):
+            g1 = g1_list[0] + g1_list[1] + g1_list[2]
+            g2 = g2_list[0] + g2_list[1] + g2_list[2]
+            g1g2 = g1 + g2
+            den = 4*(g1g2.M()**2) + 6*np.sum([q.M()**2 for q in g1_list+g2_list])
+            m_63_2 = [(g1.M()**2)/den, (g2.M()**2)/den]
             return np.sqrt(m_63_2)
             
-        def form_d2(m_63_ijk, D_32_t1, D_32_t2):
-            d2_a = (np.sqrt(m_63_ijk[0]**2 + D_32_t1**2) - (1./np.sqrt(20)))**2
-            d2_b = (np.sqrt(m_63_ijk[1]**2 + D_32_t2**2) - (1./np.sqrt(20)))**2
+        def form_d2(m_63_ijk, D_32_g1, D_32_g2):
+            d2_a = (np.sqrt(m_63_ijk[0]**2 + D_32_g1**2) - (1./np.sqrt(20)))**2
+            d2_b = (np.sqrt(m_63_ijk[1]**2 + D_32_g2**2) - (1./np.sqrt(20)))**2
             return d2_a + d2_b 
 
-        def form_dalitz(t1_list,t2_list):
+        def form_dalitz(g1_list,g2_list):
             # find min and max dR in first gluino
-            m_32_t1 = from_tlist_to_m32(t1_list) # list of 3
-            m_32_t2 = from_tlist_to_m32(t2_list) # list of 3
-            D_32_t1 = d_32_from_m32(m_32_t1) # single value
-            D_32_t2 = d_32_from_m32(m_32_t2) # single value
-            m_63_ijk = form_m_63_ijk(t1_list, t2_list) # list of 2
-            D2 = form_d2(m_63_ijk, D_32_t1, D_32_t2) # single value
-            #print('m_32_t1:', m_32_t1)
-            #print('m_32_t2:', m_32_t2)
-            #print('D_32_t1:', D_32_t1)
-            #print('D_32_t2:', D_32_t2)
+            m_32_g1 = from_tlist_to_m32(g1_list) # list of 3
+            m_32_g2 = from_tlist_to_m32(g2_list) # list of 3
+            D_32_g1 = d_32_from_m32(m_32_g1) # single value
+            D_32_g2 = d_32_from_m32(m_32_g2) # single value
+            m_63_ijk = form_m_63_ijk(g1_list, g2_list) # list of 2
+            D2 = form_d2(m_63_ijk, D_32_g1, D_32_g2) # single value
+            #print('m_32_g1:', m_32_g1)
+            #print('m_32_g2:', m_32_g2)
+            #print('D_32_g1:', D_32_g1)
+            #print('D_32_g2:', D_32_g2)
             #print('')
-            return m_32_t1, m_32_t2, D_32_t1, D_32_t2, m_63_ijk, D2 # 3, 3, 1, 1, 2, 1
+            return m_32_g1, m_32_g2, D_32_g1, D_32_g2, m_63_ijk, D2 # 3, 3, 1, 1, 2, 1
 
         def min_max_angular_in_t(t_list, deltaR=False):
             pairs = list(itertools.combinations(range(3), 2))
@@ -408,16 +408,16 @@ def build_tree(args):
                 if d < min_d: min_d = d
             return (min_d, max_d)
 
-        def form_angular_var(t1_list,t2_list):
-            t1 = t1_list[0] + t1_list[1] + t1_list[2]
-            t2 = t2_list[0] + t2_list[1] + t2_list[2]
-            dphi_t1_t2 = np.abs(t1.DeltaPhi(t2))
-            dR_t1_t2 = t1.DeltaR(t2)
-            dphi_t1 = min_max_angular_in_t(t1_list, deltaR=False)
-            dR_t1 = min_max_angular_in_t(t1_list, deltaR=True)
-            dphi_t2 = min_max_angular_in_t(t2_list, deltaR=False)
-            dR_t2 = min_max_angular_in_t(t2_list, deltaR=True)
-            return dphi_t1_t2, dR_t1_t2, dphi_t1, dR_t1, dphi_t2, dR_t2 # sizes: 1, 1, 2, 2, 2, 2
+        def form_angular_var(g1_list,g2_list):
+            g1 = g1_list[0] + g1_list[1] + g1_list[2]
+            g2 = g2_list[0] + g2_list[1] + g2_list[2]
+            dphi_g1_g2 = np.abs(g1.DeltaPhi(g2))
+            dR_g1_g2 = g1.DeltaR(g2)
+            dphi_g1 = min_max_angular_in_t(g1_list, deltaR=False)
+            dR_g1 = min_max_angular_in_t(g1_list, deltaR=True)
+            dphi_g2 = min_max_angular_in_t(g2_list, deltaR=False)
+            dR_g2 = min_max_angular_in_t(g2_list, deltaR=True)
+            return dphi_g1_g2, dR_g1_g2, dphi_g1, dR_g1, dphi_g2, dR_g2 # sizes: 1, 1, 2, 2, 2, 2
 
         def form_tops(jets_all, from_top, same_as_lead,  is_b, njets):
             #print('Number of jets:', len(jets_all))
@@ -469,7 +469,7 @@ def build_tree(args):
             pred_same_as_lead.insert(0,1) 
             # print("pred_same_as_lead")
             # print(pred_same_as_lead)
-            t1_list = [t for i,t in enumerate(jets) if pred_same_as_lead[i]>0]
+            g1_list = [t for i,t in enumerate(jets) if pred_same_as_lead[i]>0]
             is_from_top_1 = 0
             is_from_top_2 = 0
             sal_score_1 = 1 # len(pred_same_as_lead)=5
@@ -487,27 +487,27 @@ def build_tree(args):
             sal_score_1 = sal_score_1/3.0
             sal_score_2 = sal_score_2/3.0
             sum_score = (is_from_top_1 + is_from_top_2 + sal_score_1 + sal_score_2)/4.0
-            #print("t1_list")
-            #print(len(t1_list))
-            t1 = t1_list[0]+t1_list[1]+t1_list[2]
-            t2_list = [t for i,t in enumerate(jets) if pred_same_as_lead[i]<1]
-            #print("t2_list")
-            # print(len(t2_list))
-            t2 = t2_list[0]+t2_list[1]+t2_list[2]
+            #print("g1_list")
+            #print(len(g1_list))
+            g1 = g1_list[0]+g1_list[1]+g1_list[2]
+            g2_list = [t for i,t in enumerate(jets) if pred_same_as_lead[i]<1]
+            #print("g2_list")
+            # print(len(g2_list))
+            g2 = g2_list[0]+g2_list[1]+g2_list[2]
             if args.pt_order:
-                if t2.Pt() > t1.Pt(): 
-                    t1,t2=t2,t1 # call t1 the top with leading pt        
-                    t1_list,t2_list = t2_list,t1_list # change lists as well
+                if g2.Pt() > g1.Pt(): 
+                    g1,g2=g2,g1 # call g1 the top with leading pt        
+                    g1_list,g2_list = g2_list,g1_list # change lists as well
             # dalitz variables 
-            dalitz_var = form_dalitz(t1_list,t2_list) # lenght of variables: 3, 3, 1, 1, 2, 1
-            angular = form_angular_var(t1_list,t2_list)
-            return t1, t2, (is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score), dalitz_var, angular
+            dalitz_var = form_dalitz(g1_list,g2_list) # lenght of variables: 3, 3, 1, 1, 2, 1
+            angular = form_angular_var(g1_list,g2_list)
+            return g1, g2, (is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score), dalitz_var, angular
 
-        t1, t2, scores, dalitz, angular = form_tops(jets_all, from_top, same_as_lead,  is_b, args.jets)
-        mt1_reco[0] = t1.M()
-        mt2_reco[0] = t2.M()
-        pt1_reco[0] = t1.Pt()
-        pt2_reco[0] = t2.Pt()
+        g1, g2, scores, dalitz, angular = form_tops(jets_all, from_top, same_as_lead,  is_b, args.jets)
+        mg1_reco[0] = g1.M()
+        mg2_reco[0] = g2.M()
+        pg1_reco[0] = g1.Pt()
+        pg2_reco[0] = g2.Pt()
         
         score_is_from_tt_1[0] = scores[0]
         score_is_from_tt_2[0] = scores[1]
@@ -515,34 +515,34 @@ def build_tree(args):
         score_same_as_lead_2[0] = scores[3]
         score_sum[0] = scores[4]
 
-        #m_32_t1, m_32_t2, D_32_t1, D_32_t2, m_63_ijk, D2
-        m_32_t1[0] = dalitz[0][0]
-        m_32_t1[1] = dalitz[0][1]
-        m_32_t1[2] = dalitz[0][2]
-        m_32_t2[0] = dalitz[1][0]
-        m_32_t2[1] = dalitz[1][1]
-        m_32_t2[2] = dalitz[1][2]
-        D_32_t1[0] = dalitz[2]
-        D_32_t2[0] = dalitz[3]
+        #m_32_g1, m_32_g2, D_32_g1, D_32_g2, m_63_ijk, D2
+        m_32_g1[0] = dalitz[0][0]
+        m_32_g1[1] = dalitz[0][1]
+        m_32_g1[2] = dalitz[0][2]
+        m_32_g2[0] = dalitz[1][0]
+        m_32_g2[1] = dalitz[1][1]
+        m_32_g2[2] = dalitz[1][2]
+        D_32_g1[0] = dalitz[2]
+        D_32_g2[0] = dalitz[3]
         m_63_ijk[0] = dalitz[4][0]
         m_63_ijk[1] = dalitz[4][1]
         D2[0] = dalitz[5]
         
-        # dphi_t1_t2, dR_t1_t2, dphi_t1, dR_t1, dphi_t2, dR_t2 # sizes: 1, 1, 2, 2, 2, 2
-        dphi_t1_t2[0] = angular[0]
-        dR_t1_t2[0] = angular[1]
-        dphi_t1_min[0] = angular[2][0]
-        dphi_t1_max[0] = angular[2][1]
-        dR_t1_min[0] = angular[3][0]
-        dR_t1_max[0] = angular[3][1]
-        dphi_t2_min[0] = angular[4][0]
-        dphi_t2_max[0] = angular[4][1]
-        dR_t2_min[0] = angular[5][0]
-        dR_t2_max[0] = angular[5][1]
+        # dphi_g1_g2, dR_g1_g2, dphi_g1, dR_g1, dphi_g2, dR_g2 # sizes: 1, 1, 2, 2, 2, 2
+        dphi_g1_g2[0] = angular[0]
+        dR_g1_g2[0] = angular[1]
+        dphi_g1_min[0] = angular[2][0]
+        dphi_g1_max[0] = angular[2][1]
+        dR_g1_min[0] = angular[3][0]
+        dR_g1_max[0] = angular[3][1]
+        dphi_g2_min[0] = angular[4][0]
+        dphi_g2_max[0] = angular[4][1]
+        dR_g2_min[0] = angular[5][0]
+        dR_g2_max[0] = angular[5][1]
 
-        t1_random, t2_random, scores_random, dalitz_random, angular_random = form_tops(jets_all, from_top_random, same_as_lead_random,  is_b_random, args.jets)
-        mt1_random[0] = t1_random.M()
-        mt2_random[0] = t2_random.M()
+        g1_random, g2_random, scores_random, dalitz_random, angular_random = form_tops(jets_all, from_top_random, same_as_lead_random,  is_b_random, args.jets)
+        mg1_random[0] = g1_random.M()
+        mg2_random[0] = g2_random.M()
 
         njets_=0
         njets_25_=0
@@ -593,11 +593,12 @@ def build_tree(args):
         pass_reco_chi2_nobfixed[0] = -99
         pass_reco_chi2_bfixed[0] = -99
         pass_anatop[0] = -99
-        mt1_chi2_nobfixed[0] = -99
-        mt2_chi2_nobfixed[0] = -99
-        mt1_chi2_bfixed[0] = -99
-        mt2_chi2_bfixed[0] = -99
-        
+        mg1_chi2_nobfixed[0] = -99
+        mg2_chi2_nobfixed[0] = -99
+        mg1_chi2_bfixed[0] = -99
+        mg2_chi2_bfixed[0] = -99
+
+        has_truth[0] = int(t.has_truth)        
         if t.has_truth:
             # true info
             true_from_top = [t.from_top_0_true, t.from_top_1_true, t.from_top_2_true, t.from_top_3_true, t.from_top_4_true, t.from_top_5_true]
@@ -617,60 +618,64 @@ def build_tree(args):
             true_is_b = [t.is_b_0_true, t.is_b_1_true, t.is_b_2_true, t.is_b_3_true, t.is_b_4_true, t.is_b_5_true]
             true_same_as_lead = [t.same_as_lead_0_true, t.same_as_lead_1_true, t.same_as_lead_2_true, t.same_as_lead_3_true, t.same_as_lead_4_true]
             true_same_as_lead.insert(0,1)
-            t1_list_true = [t for i,t in enumerate(jets_true) if true_same_as_lead[i]>0]
+            g1_list_true = [t for i,t in enumerate(jets_true) if true_same_as_lead[i]>0]
+            if len(jets_true)<6: 
+                has_truth[0] = 0
+        
+            #print("true_from_top")
+            #print(true_from_top)
             #print("jets_true")
             #print(jets_true)
             #print("len(jets_true)")
             #print(len(jets_true))
-            #print("t1_list_true")
-            #print(t1_list_true)
+            #print("g1_list_true")
+            #print(g1_list_true)
             #print("true_same_as_lead")
             #print(true_same_as_lead)
-            t1_true = t1_list_true[0]+t1_list_true[1]+t1_list_true[2]
-            t2_list_true = [t for i,t in enumerate(jets_true) if true_same_as_lead[i]<1]
-            t2_true = t2_list_true[0]+t2_list_true[1]+t2_list_true[2]
-            # call t1 the top with leading pt
+        if has_truth[0] >0:
+            g1_true = g1_list_true[0]+g1_list_true[1]+g1_list_true[2]
+            g2_list_true = [t for i,t in enumerate(jets_true) if true_same_as_lead[i]<1]
+            g2_true = g2_list_true[0]+g2_list_true[1]+g2_list_true[2]
+            # call g1 the top with leading pt
             if args.pt_order:
-                if t2_true.Pt() > t1_true.Pt(): t1_true,t2_true=t2_true,t1_true          
-            mt1_true[0] = t1_true.M()
-            mt2_true[0] = t2_true.M()
+                if g2_true.Pt() > g1_true.Pt(): g1_true,g2_true=g2_true,g1_true          
+            mg1_true[0] = g1_true.M()
+            mg2_true[0] = g2_true.M()
         
-            alpaca_good_mt1[0] = (round(mt1_true[0],2) == round(mt1_reco[0],2)) or (round(mt2_true[0],2) == round(mt1_reco[0],2))
-            alpaca_good_mt2[0] = (round(mt2_true[0],2) == round(mt2_reco[0],2)) or  (round(mt1_true[0],2) == round(mt2_reco[0],2))
+            alpaca_good_mg1[0] = (round(mg1_true[0],2) == round(mg1_reco[0],2)) or (round(mg2_true[0],2) == round(mg1_reco[0],2))
+            alpaca_good_mg2[0] = (round(mg2_true[0],2) == round(mg2_reco[0],2)) or  (round(mg1_true[0],2) == round(mg2_reco[0],2))
             
             '''
             if t.has_chi2:
-                chi2_good_mt1[0] = (round(mt1_true[0],2) == round(mt1_chi2_nobfixed[0],2)) or (round(mt2_true[0],2) == round(mt1_chi2_nobfixed[0],2))
-                chi2_good_mt2[0] = (round(mt2_true[0],2) == round(mt2_chi2_nobfixed[0],2)) or (round(mt1_true[0],2) == round(mt2_chi2_nobfixed[0],2)) 
+                chi2_good_mg1[0] = (round(mg1_true[0],2) == round(mg1_chi2_nobfixed[0],2)) or (round(mg2_true[0],2) == round(mg1_chi2_nobfixed[0],2))
+                chi2_good_mg2[0] = (round(mg2_true[0],2) == round(mg2_chi2_nobfixed[0],2)) or (round(mg1_true[0],2) == round(mg2_chi2_nobfixed[0],2)) 
             else:
             '''
-            chi2_good_mt1[0] = -99
-            chi2_good_mt2[0] = -99
+            chi2_good_mg1[0] = -99
+            chi2_good_mg2[0] = -99
 
         else:
-            mt1_true[0] = -99
-            mt2_true[0] = -99
-            alpaca_good_mt1[0] = -99
-            alpaca_good_mt2[0] = -99
-            chi2_good_mt1[0] = -99
-            chi2_good_mt2[0] = -99
-            
-        has_truth[0] = int(t.has_truth)
+            mg1_true[0] = -99
+            mg2_true[0] = -99
+            alpaca_good_mg1[0] = -99
+            alpaca_good_mg2[0] = -99
+            chi2_good_mg1[0] = -99
+            chi2_good_mg2[0] = -99            
 
         wei[0]=1
         for w in args.weights: 
             readw = getattr(t, w)
             wei[0] = wei[0]*readw
 
-        output_m1.append(mt1_reco[0])
-        output_m2.append(mt2_reco[0])
+        output_m1.append(mg1_reco[0])
+        output_m2.append(mg2_reco[0])
 
         t_out.Fill()
         
         #if ientry%1000==0:
         #    print(ientry)
-        #    print('M1 reco:',t1.M(),      ' M2 reco:',t2.M())
-        #    print('M1 true:',t1_true.M(), ' M2 true:',t2_true.M())
+        #    print('M1 reco:',g1.M(),      ' M2 reco:',g2.M())
+        #    print('M1 true:',g1_true.M(), ' M2 true:',g2_true.M())
         
     f_out.Write()
     f_out.Close()
