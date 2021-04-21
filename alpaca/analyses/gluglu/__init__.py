@@ -6,16 +6,15 @@ import numpy as np
 from alpaca.core import BaseMain
 from alpaca.batch import BatchManager
 
-use_btag=True # chiara: put as cli argument
 n_jet_in_input=20 # chiara: can compute this from column names
 
 log = logging.getLogger(__name__)
 
 def register_cli(subparser, parentparser):
 
-    analysis_name = 'allhad_ttbar_chiara'
+    analysis_name = 'gluglu'
     analysis_defaults = {
-        "Main"       : MainTtbarChiara, #no quotes, pointer to the class
+        "Main"       : MainGluGlu, #no quotes, pointer to the class
         "extras"     : 0,
         "outputs"    : "n,5,6",
         "jets"       : 7,
@@ -26,7 +25,7 @@ def register_cli(subparser, parentparser):
 
     # Create your own sub-command and add arguments
     parser = subparser.add_parser(analysis_name, parents=[parentparser],
-                                   help='All-hadronic ttbar (Chiara version) sub-command.')
+                                   help='Glu Glu (Chiara version) sub-command.')
     parser.add_argument('--not-all-partons', action='store_true')
     parser.add_argument('--no-truth', action='store_true')
 
@@ -34,15 +33,15 @@ def register_cli(subparser, parentparser):
     return analysis_name, analysis_defaults
 
 
-class MainTtbarChiara(BaseMain):
+class MainGluGlu(BaseMain):
 
     def __init__(self, args):
         super().__init__(args)
-        self.train_bm = BatchManagerTtbarChiara(args)
+        self.train_bm = BatchManagerGluGlu(args)
         self.test_bm  = []
 
     def plots(self):
-        log.warning("No plots for MainTtbarChiara")
+        log.warning("No plots for MainGluGlu")
 
     def write_output(self, torch_batch, _P):
         X,Y = torch_batch[0], torch_batch[1]
@@ -51,14 +50,24 @@ class MainTtbarChiara(BaseMain):
         _Y = Y.data.numpy()
         _X = X.data.numpy()
         jet_vars = ['jet_px','jet_py','jet_pz','jet_e']
-        if use_btag:
-            jet_vars.append('jet_isDL177')
+        extra_fields = set(self.args.extra_jet_fields)
+        for extra in extra_fields:
+            jet_vars.append(extra)
         col_X = [j+'_'+str(i) for i in range(self.args.jets) for j in jet_vars]
         df_X = pd.DataFrame(data = _X, columns=col_X)
         if len(torch_batch) > 2:
             for i,s in enumerate(self.args.spectators):
                 df_X[s]=spec[:,i]
-        col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
+        if Y.shape[1] > 1:
+            col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
+        else:
+            col_P = ['tagged']
+        print("Y")
+        print(Y)
+        print(Y.shape)
+        print(col_P)
+        print(len(col_P))
+        print(_P.shape)
         df_P = pd.DataFrame(data = _P, columns=col_P)
 
         if self.args.no_truth:
@@ -73,16 +82,18 @@ class MainTtbarChiara(BaseMain):
         df_test.to_csv(output_name)
 
 
-class BatchManagerTtbarChiara(BatchManager):
+class BatchManagerGluGlu(BatchManager):
 
     @staticmethod
     def get_objects(df, args, **kwargs):
 
         # remove category -- note: look for better way of doing this
         columns_keep = [c for c in df.columns if 'alpaca' not in c[0]]
-        df=df[columns_keep]
+        if not args.input_categories:
+            df=df[columns_keep]
 
-        # print('input df shape', df.shape)
+        print('input df shape', df.shape)
+        print(df.columns)
 
         jets_per_event = args.jets
         zero_jets = args.zero_jets
@@ -91,7 +102,7 @@ class BatchManagerTtbarChiara(BatchManager):
         if args.train: use_truth=True
 
         # FIXME: pass these as arguments
-        all_partons_included=True
+        all_partons_included=False
         qcd_like=False
 
         tot_jets_per_event = len(df['jet_e'].columns.get_level_values('subentry'))
@@ -133,12 +144,18 @@ class BatchManagerTtbarChiara(BatchManager):
         # So segment and swap axes to group by jet
         spectators = []
         for s in args.spectators:            
-            spectators.append(df[s][0]) 
-        df = df[[c for c in df.columns if c[0] not in args.spectators]]
-        n_comp = 4 # 4 ccomponents for each jet (e, px, py, pz)
-        if use_btag: n_comp += 1 # read also is_btag
+            if s in [c[0] for c in df.columns]:
+                spectators.append(df[s][0]) 
+            else:
+                spectators.append(np.zeros(len(df)))
+        extra_fields = set(args.extra_jet_fields)
+        #print('chiara columns')
+        #print(df.columns)
+        #print([c for c in df.columns if c[0] not in args.spectators and (not 'alpaca' in c[0] and c[1]<n_jet_in_input)])
+        df_jets = df[[c for c in df.columns if c[0] not in args.spectators and ('alpaca' not in c[0] and c[1]<n_jet_in_input)]]
+        n_comp = 4 + len(extra_fields) # 4 ccomponents for each jet (e, px, py, pz) plus the extra components        
         n_info_jet = n_comp if args.no_truth else n_comp+1 # if reading truth, read also parton label
-        jet_stack = np.swapaxes(df.values.reshape(len(df), n_info_jet, n_jet_in_input), 1, 2)
+        jet_stack = np.swapaxes(df_jets.values.reshape(len(df_jets), n_info_jet, n_jet_in_input), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
 
         #Reverse to intuitive order
@@ -146,14 +163,13 @@ class BatchManagerTtbarChiara(BatchManager):
         jet_px = jet_stack[:, :, 1]
         jet_py = jet_stack[:, :, 2]
         jet_pz = jet_stack[:, :, 3]
-        if use_btag:
-            jet_btag = jet_stack[:, :, 4]
+        
         jet_stack[:, :, 0] = jet_px
         jet_stack[:, :, 1] = jet_py
         jet_stack[:, :, 2] = jet_pz
         jet_stack[:, :, 3] = jet_e
-        if use_btag:
-            jet_stack[:, :, 4] = jet_btag
+        for i in range(len(extra_fields)):
+            jet_stack[:, :, 4+i] = jet_stack[:, :, 4+i]
 
         #jet_stack_pt = np.sqrt(jet_stack[:, :, 0]**2+jet_stack[:, :, 1]**2)
         #jet_stack_eta = np.arcsinh(jet_stack[:, :, 2]/np.maximum(jet_stack_pt,np.ones(jet_stack[:, :,0].shape)))
@@ -171,6 +187,22 @@ class BatchManagerTtbarChiara(BatchManager):
 
         jets = labeledjets[:, :, :n_comp]
         # print('jets  shape:',jets.shape)
+
+        # signal vs background classification
+        if args.input_categories:
+            print('Chiara! Doing signal vs background classification')
+            #print('ncategories', args.ncategories)
+            labels = BatchManager.get_event_labels(df, args.ncategories)
+            #print(labels.shape)
+            #print(labels)
+            # chiara 
+            labels = labels.values.reshape(len(labels),1)
+            print(labels.shape)
+            #print(labels)
+            spectators_formatted = np.vstack(spectators).T if(len(args.spectators)>0) else None
+            return jets,None,None, labels, spectators_formatted
+
+        # if we arrive here, we are doing event reconstruction
         if use_truth:
             labels = np.array(labeledjets[:, :, -1:].squeeze(), dtype=int) # partonindex
             #if all_partons_included==False:
@@ -186,10 +218,16 @@ class BatchManagerTtbarChiara(BatchManager):
             # Account for charge ambiguity by identifying whether the
             # jets match the leading jet or not
             maskedlabels = np.ma.masked_where(jetfromttbar == False, labels)
-            nonisrlabels = np.array([r.compressed() for r in maskedlabels])
+            nonisrlabels = [r.compressed() for r in maskedlabels]
+            # chiara: not ideal, find a better way! 
+            for ia,a in enumerate(list(nonisrlabels)):
+                if not a.shape[0] == 6:
+                    nonisrlabels[ia] = np.append(nonisrlabels[ia], [0 for i in range(6-a.shape[0])] )
+            nonisrlabels = np.array(nonisrlabels)
             topmatch = np.array([r > 3 if r[0] > 3 else r <= 3 for r in nonisrlabels])
             isbjet = np.array([np.equal(r, 1) | np.equal(r, 4) for r in nonisrlabels])
             jetlabels = np.concatenate([jetfromttbar, topmatch[:, 1:], isbjet], 1)
+
             # Substitute this line for the preceding if only doing the 6 top jets
             # Not currently configurable by command line because it's a bit more
             # complicated overall + less often changed
@@ -226,7 +264,7 @@ class BatchManagerTtbarChiara(BatchManager):
             return jets_clean,None,None, jetlabels_clean, spectators_formatted_clean
 
         else:
-            jetlabels = np.zeros((jets.shape[0], 1))
+            jetlabels = np.zeros((jets.shape[0], 2))
             spectators_formatted = np.vstack(spectators).T if(len(args.spectators)>0) else None
             return jets,None,None, jetlabels, spectators_formatted
  

@@ -80,7 +80,7 @@ class BaseMain:
                 opt.zero_grad()
                 
                 train_torch_batch = self.train_bm.get_torch_batch(batch_size, start_index=i * batch_size + test_sample)
-                X, Y = train_torch_batch[0], train_torch_batch[1]            
+                X, Y = train_torch_batch[0], train_torch_batch[1]  
                 P = model(X)
                 Y = Y.reshape(-1, args.totaloutputs)
                 
@@ -89,7 +89,10 @@ class BaseMain:
                     Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
                     Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
                     loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi)
-                    loss['total'] += loss[cat]/len(args.categories)
+                    # give more weight to signal events
+                    #weight = Yi*9 + 1
+                    #loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi, weight=weight)
+                    loss['total'] += loss[cat]
 
                 for key, val in loss.items():
                     self.losses[key].append(float(val))
@@ -160,7 +163,7 @@ class BaseMain:
                 flatdict["truth_{}_{}".format(cat, sample)] = Yi
             np.savez(str(output_dir / "data.npz"), **flatdict)
             '''            
-            print('looking at staandard way')
+            print('looking at standard way')
             P=model(X)
             _P = P.data.numpy()
             # print('to numpy')

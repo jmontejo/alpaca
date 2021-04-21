@@ -25,10 +25,18 @@ class BatchManager:
         tmp_spectators = []
 
         for input_path, category in zip_longest(args.input_files, args.input_categories):
+            print(input_path)
+            print(dfname)            
             df = pd.read_hdf(input_path, dfname)
             df[self.internal_category_name] = category
             df = df.replace(True, 1)
             df = df.replace(False, 0)
+            print('shape',df.shape[0])
+            #if category == 0:
+            #    print('category 0')
+            #    keep_index = np.random.random(df.shape[0]) < 0.1
+            #    df = df[keep_index]
+            print('new shape',df.shape[0])
 
             jets, extras, scalars, labels, spectators = self.get_objects(
                 df, args,
