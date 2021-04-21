@@ -130,7 +130,7 @@ class BaseMain:
     #def plots(self): ## should store the NN and then do the plotting as a separate step
         output_dir = self.get_output_dir()
         # Run for performance
-        for bm in [self.train_bm] + self.test_bm:
+        for bm,sample in zip([self.train_bm] + self.test_bm,("Test","Bkg")):
             test_torch_batch = bm.get_torch_batch(test_sample)
             X,Y = test_torch_batch[0], test_torch_batch[1]
             _X = X.data.numpy()
@@ -145,13 +145,12 @@ class BaseMain:
             #FIXME, think about many bm plots
             _P = np.vstack(_P_list)
             flatdict = {}
-            sample = "Test"
 
             if self.args.nscalars:
                 _X = _X[:,:-self.args.nscalars]
             _X = _X.reshape(X.shape[0],self.args.jets+self.args.extras,4+self.args.nextrafields)
 
-            flatdict["jets_{}".format(sample)] = _X
+            flatdict["jets_{}".format(sample)] = _X.data.numpy()
             for i,cat in enumerate(args.categories):
                 print(cat)
                 Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
