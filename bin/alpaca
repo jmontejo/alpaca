@@ -122,7 +122,7 @@ if __name__ == '__main__':
     log.info('Nr. of events: %s', bm.get_nr_events())
 
     noutputs = njets*4
-    test_sample = 20000
+    test_sample = min(bm.get_nr_events(),20000)
     nr_train = floor(sqrt(bm.get_nr_events()-test_sample))
     batch_size = nr_train
     no_train = os.path.exists(param_file) and not args.force
@@ -149,15 +149,21 @@ if __name__ == '__main__':
         else:
             # Plain CoLaLoLa as default
             if args.per_jet:
-                from alpaca.nn.colalolaperjet import CoLaLoLaPerJet as CoLaLoLa
+                from alpaca.nn.colalolaperjet import CoLaLoLaPerJet
+                log.info('CoLaLoLaPerJet: nr. jets %s - nr. combos %s', njets,
+                         args.ncombos)
+                log.info('  FeedForwardHead intermediate layers: [%s]',
+                         layerstr.replace('_', ','))
+                model = CoLaLoLaPerJet(njets, 3, args.ncombos, noutputs,
+                                 fflayers=args.fflayers, nextrafields=1)
             else:
                 from alpaca.nn.colalola import CoLaLoLa
-            log.info('CoLaLoLa: nr. jets %s - nr. combos %s', njets,
-                     args.ncombos)
-            log.info('  FeedForwardHead intermediate layers: [%s]',
-                     layerstr.replace('_', ','))
-            model = CoLaLoLa(njets+3, args.ncombos, noutputs,
-                             fflayers=args.fflayers, usebjet=args.use_bjet)
+                log.info('CoLaLoLa: nr. jets %s - nr. combos %s', njets,
+                         args.ncombos)
+                log.info('  FeedForwardHead intermediate layers: [%s]',
+                         layerstr.replace('_', ','))
+                model = CoLaLoLa(njets+3, args.ncombos, noutputs,
+                                 fflayers=args.fflayers, usebjet=args.use_bjet)
 
         opt = torch.optim.Adam(model.parameters())
         losses = {"total": [], "ISR": [], "lep0top": [], "lep1top": [], "had0top": []}
@@ -249,7 +255,7 @@ if __name__ == '__main__':
     fill_arrays(
         bm.get_torch_batch(
             test_sample,
-            start_index=test_sample
+            start_index=0,
         ),
         "Train",
         model
@@ -268,7 +274,7 @@ if __name__ == '__main__':
     # sample from the last events of the 39k 6-jet events
     fill_arrays(
         bm_6j.get_torch_batch(
-            test_sample,
+            bm_6j.get_nr_events(),
             start_index=0
         ),
         "6-jet",
