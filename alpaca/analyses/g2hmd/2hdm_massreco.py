@@ -29,8 +29,9 @@ def register_cli(subparser,parentparser):
     parser.add_argument('--npz', type=Path,
                         help='path to the npz file out of alpaca')
     parser.add_argument('--small', action="store_true")
-    parser.add_argument('--output-dir', type=Path,
-                        help='path to the output directory')
+    # chiara: commented out as --output-dir is already an option of the sharedparser
+    # parser.add_argument('--output-dir', type=Path,
+    #                    help='path to the output directory')
     parser.add_argument('--allow-2jet', action="store_true",
                     help='Use two or more jets for the tops')
     parser.add_argument('--normalize-scores', action="store_true",
