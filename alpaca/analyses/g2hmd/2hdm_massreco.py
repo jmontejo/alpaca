@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 from alpaca.core import BaseMain
-from alpaca.analysis.g2hmd.my2hmd import BatchManager2HDM
+from alpaca.analyses.g2hmd.my2hmd import BatchManager2HDM
 
 log = logging.getLogger(__name__)
 
