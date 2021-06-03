@@ -28,6 +28,9 @@ def register_cli(subparser, parentparser):
                                    help='Glu Glu (Chiara version) sub-command.')
     parser.add_argument('--not-all-partons', action='store_true')
     parser.add_argument('--no-truth', action='store_true')
+    # set as mutually exclusive to plan for other possibilities (e.g. divide by HT)
+    scalechoice = parser.add_mutually_exclusive_group()
+    scalechoice.add_argument('--scale-e', action='store_true', help='Divide the jet 4-momentum by the sum of the energy of the jets in the event (conside only the jets used in alpaca)')
 
 
     return analysis_name, analysis_defaults
@@ -157,13 +160,26 @@ class BatchManagerGluGlu(BatchManager):
         n_info_jet = n_comp if args.no_truth else n_comp+1 # if reading truth, read also parton label
         jet_stack = np.swapaxes(df_jets.values.reshape(len(df_jets), n_info_jet, n_jet_in_input), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
-
         #Reverse to intuitive order
         jet_e = np.copy(jet_stack[:, :, 0])
         jet_px = jet_stack[:, :, 1]
         jet_py = jet_stack[:, :, 2]
         jet_pz = jet_stack[:, :, 3]
-        
+
+        if args.scale_e:
+            # sum of energy of the considered jets in each event
+            # keepdims=True needed to be able to broadcast against the original array
+            sum_jet_e = np.sum(jet_e, axis=1, keepdims=True)
+            jet_e = jet_e/sum_jet_e
+            jet_px = jet_px/sum_jet_e
+            jet_py = jet_py/sum_jet_e
+            jet_pz = jet_pz/sum_jet_e
+
+        #print('jet_e')
+        #print(jet_e)
+        #print('sum jet_e')
+        #print(np.sum(jet_e, axis=1, keepdims=True))
+
         jet_stack[:, :, 0] = jet_px
         jet_stack[:, :, 1] = jet_py
         jet_stack[:, :, 2] = jet_pz
