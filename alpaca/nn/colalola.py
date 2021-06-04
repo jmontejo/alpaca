@@ -30,14 +30,17 @@ class LoLa(torch.nn.Module):
     def __init__(self, outputobj, nextrafields=0):
         super(LoLa, self).__init__()
         self.outputobj = outputobj
+        self.nextrafields = nextrafields
         self.w_dist = torch.nn.Parameter(torch.randn(self.outputobj,
                                                      self.outputobj))
         self.w_ener = torch.nn.Parameter(torch.randn(self.outputobj,
                                                      self.outputobj))
         self.w_pid = torch.nn.Parameter(torch.randn(self.outputobj,
                                                     self.outputobj))
+        self.w_extras = torch.nn.ParameterList(
+            [torch.nn.Parameter(torch.randn(self.outputobj, self.outputobj)) for i in range(self.nextrafields)])
         self.metric = torch.diag(torch.tensor([-1., -1., -1., 1.]))
-        self.nextrafields = nextrafields
+
 
     # Calculate Lorentz invariants from the input four-vectors
     # These four-vectors are either the original jets, or the
@@ -47,7 +50,7 @@ class LoLa(torch.nn.Module):
         weighted_pz = torch.einsum('ij,bj->bi', self.w_pid,combvec[:, :, 3])
         weighted_extras = {}
         for i in range(self.nextrafields):
-            weighted_extras[i] = torch.einsum('ij,bj->bi', self.w_pid,combvec[:, :, 4+i])
+            weighted_extras[i] = torch.einsum('ij,bj->bi', self.w_extras[i],combvec[:, :, 4+i])
         a = combvec[..., :4].unsqueeze(2).repeat(1, 1, self.outputobj, 1)
         b = combvec[..., :4].unsqueeze(1).repeat(1, self.outputobj, 1, 1)
         diff = (a - b)
