@@ -101,31 +101,6 @@ class BaseMain:
             log.debug('Finished training')
             torch.save(model, param_file )
 
-            # chiara: why does this go here and not after model.eval()?
-            # this breaks the code gor gluglu analysis (in particular the loop "for ijet in range(self.args.jets)", since the shape of each category is different and not related to self.args.jets
-            # is this meant to be done only when running per-jet? 
-            '''
-            test_torch_batch = self.train_bm.get_torch_batch(test_sample, 0)
-            X, Y = test_torch_batch[0], test_torch_batch[1]            
-            P = model(X).data.numpy()
-            Y = Y.reshape(-1, args.totaloutputs).data.numpy()
-            print("self.args.jets:",self.args.jets)
-            print("args.totaloutputs",args.totaloutputs)
-            print("P.shape:",P.shape)
-            print("Y.shape:",Y.shape)
-            for i,cat in enumerate(args.categories):
-                Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
-                Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
-                print(" i,cat:",i,cat)
-                print(" Pi.shape:",Pi.shape)
-                print(" Yi.shape:",Yi.shape)
-
-                self.losses["ROC_"+cat] = 0                
-                for ijet in range(self.args.jets):
-                    self.losses["ROC_"+cat] += get_roc_auc(Pi[:,ijet],Yi[:,ijet])
-                self.losses["ROC_"+cat]     = [self.losses["ROC_"+cat]/self.args.jets for x in self.losses[cat]]
-            '''
-
             fig = plt.figure()
             for losstype, lossvals in self.losses.items():
                 plt.plot(lossvals, label=losstype)
@@ -164,26 +139,6 @@ class BaseMain:
                 _X = _X[:,:-self.args.nscalars]
             _X = _X.reshape(X.shape[0],self.args.jets+self.args.extras,4+self.args.nextrafields)
 
-            # chiara: this commented block gives the following error:
-            # AttributeError: 'memoryview' object has no attribute 'numpy'
-            '''
-            flatdict["jets_{}".format(sample)] = _X.data.numpy()
-            for i,cat in enumerate(args.categories):
-                print(cat)
-                Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
-                Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
-                # Flatten & save numpy arrays
-                flatdict["pred_{}_{}".format(cat, sample)] = Pi
-                flatdict["truth_{}_{}".format(cat, sample)] = Yi
-            np.savez(str(output_dir / "data.npz"), **flatdict)
-            '''
-            '''            
-            print('looking at standard way')
-            P=model(X)
-            _P = P.data.numpy()
-            # print('to numpy')
-            # print(_P)
-            '''
         # Write results to file with analysis-specific function
         if args.write_output:
             self.write_output(test_torch_batch, _P)
