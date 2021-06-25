@@ -102,7 +102,7 @@ class BatchManager:
     def get_event_labels(df, ncategories):
         assert ncategories>=1 and type(ncategories)==int
         if ncategories == 1:
-            return df[BatchManager.internal_category_name]
+            return df[BatchManager.internal_category_name][:,np.newaxis]
         else:
             cats = range(ncategories)
             return np.stack([df[BatchManager.internal_category_name] == c for c in cats],axis=1)
@@ -176,7 +176,7 @@ class BatchManager:
         obs_jets = self._jets.shape[1] if objs_njets else 0
         obs_jet_comp = self._jets.shape[2] if objs_njets else expected_jet_comp
         obs_extras = self._extras.shape[1] if objs_nextras else 0 
-        obs_labels = self._labels.shape[1]
+        obs_labels = self._labels.shape[1] if len(self._labels.shape)>1 else 1
 
         assert expected_jets == obs_jets, \
                 "The number of jets in BatchManager (%d) is not consistent with the expected: %d"%(obs_jets, expected_jets)

@@ -34,13 +34,12 @@ class Elena(BaseMain):
 
     def __init__(self, args):
         super().__init__(args)
-        self.train_bm = BatchManagerElena(
+        self.bm = BatchManagerElena(
                 input_paths=args.input_files,
                 input_categories=args.input_categories,
                 jets_per_event = args.jets,
                 shuffle_events = args.shuffle_events,
             )
-        self.test_bm  = []
 
 
 class BatchManagerElena(BatchManager):

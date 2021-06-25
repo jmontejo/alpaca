@@ -29,9 +29,6 @@ def register_cli(subparser,parentparser):
     parser.add_argument('--npz', type=Path,
                         help='path to the npz file out of alpaca')
     parser.add_argument('--small', action="store_true")
-    # chiara: commented out as --output-dir is already an option of the sharedparser
-    # parser.add_argument('--output-dir', type=Path,
-    #                    help='path to the output directory')
     parser.add_argument('--allow-2jet', action="store_true",
                     help='Use two or more jets for the tops')
     parser.add_argument('--normalize-scores', action="store_true",
@@ -57,12 +54,12 @@ class Eval2HDM():
 
     def __init__(self, args):
         #super().__init__(args)
-        self.train_bm = BatchManager2HDM(args)
+        self.bm = BatchManager2HDM(args)
 
 
     def run(self):
         args = self.args
-        test_sample = args.test_sample if args.test_sample >= 0 else self.train_bm.get_nr_events()//10
+        test_sample = args.test_sample if args.test_sample >= 0 else self.bm.get_nr_events()//10
         output_dir = self.get_output_dir()
         output_dir.mkdir(parents=True, exist_ok=True)
         param_file = output_dir / 'NN.pt'

@@ -33,7 +33,7 @@ class MainTtbar(BaseMain):
 
     def __init__(self, args):
         super().__init__(args)
-        self.train_bm = BatchManagerTtbar(
+        self.bm = BatchManagerTtbar(
             input_files=args.input_files,
             jets_per_event=args.jets,
             zero_jets=1,
@@ -41,7 +41,6 @@ class MainTtbar(BaseMain):
             shuffle_jets=args.shuffle_jets,
             shuffle_events=args.shuffle_events,
             )
-        self.test_bm  = []
 
     def plots(self):
         log.warning("No plots for MainTtbar")
