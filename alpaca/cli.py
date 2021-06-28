@@ -119,12 +119,11 @@ def cli():
     sharedparser.set_defaults(**analysis_defaults[chosensubparser])
     args = parser.parse_args()
 
-    if "," in args.outputs:
-        args.outputs = [int(x.lower().replace("n",str(args.jets))) for x in args.outputs.split(",")]
-    else:
+    try:
         c = int(args.outputs)
         args.outputs =  [1]*c
-
+    except ValueError:
+        args.outputs = [int(x.lower().replace("n",str(args.jets))) for x in args.outputs.split(",")]
 
     args.totaloutputs = sum(args.outputs)
     args.nscalars = len(args.scalars)

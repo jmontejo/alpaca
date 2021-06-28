@@ -35,8 +35,7 @@ class Main2HDM(BaseMain):
 
     def __init__(self, args):
         super().__init__(args)
-        self.train_bm = BatchManager2HDM(args)
-        self.test_bm  = []
+        self.bm = BatchManager2HDM(args)
 
     def plots(self):
         log.warning("No plots for Main2HDM")

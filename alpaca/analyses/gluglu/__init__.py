@@ -40,8 +40,7 @@ class MainGluGlu(BaseMain):
 
     def __init__(self, args):
         super().__init__(args)
-        self.train_bm = BatchManagerGluGlu(args)
-        self.test_bm  = []
+        self.bm = BatchManagerGluGlu(args)
 
     def plots(self):
         log.warning("No plots for MainGluGlu")

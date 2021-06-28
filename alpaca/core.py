@@ -53,7 +53,7 @@ class BaseMain:
 
     def run(self):
         args = self.args
-        test_sample = args.test_sample if args.test_sample >= 0 else self.train_bm.get_nr_events()//10
+        test_sample = args.test_sample if args.test_sample >= 0 else self.bm.get_nr_events()//10
         output_dir = self.get_output_dir()
         output_dir.mkdir(parents=True, exist_ok=True)
         param_file = output_dir / 'NN.pt'
@@ -62,16 +62,16 @@ class BaseMain:
         log.debug('Alpaca has been started and can finally log')
         log.debug(self.args)
 
-        log.info('Nr. of events: %s', self.train_bm.get_nr_events())
+        log.info('Nr. of events: %s', self.bm.get_nr_events())
 
         if args.train:
 
             model = self.get_model(args)
             opt = torch.optim.Adam(model.parameters())
-            self.train_bm.is_consistent(args)
+            self.bm.is_consistent(args)
             log.debug('BatchManager contents is consistent')
 
-            nr_train = floor(sqrt(self.train_bm.get_nr_events()-test_sample))
+            nr_train = floor(sqrt(self.bm.get_nr_events()-test_sample))
             if args.fast: nr_train = int(sqrt(nr_train))
             batch_size = nr_train
             log.info('Training: %s iterations - batch size %s', nr_train, batch_size)
@@ -79,7 +79,7 @@ class BaseMain:
                 model.train()
                 opt.zero_grad()
                 
-                train_torch_batch = self.train_bm.get_torch_batch(batch_size, start_index=i * batch_size + test_sample)
+                train_torch_batch = self.bm.get_torch_batch(batch_size, start_index=i * batch_size + test_sample)
                 X, Y = train_torch_batch[0], train_torch_batch[1]  
                 P = model(X)
                 Y = Y.reshape(-1, args.totaloutputs)
@@ -119,25 +119,24 @@ class BaseMain:
         #def plots(self): ## should store the NN and then do the plotting as a separate step
         output_dir = self.get_output_dir()
         # Run for performance
-        for bm,sample in zip([self.train_bm] + self.test_bm,("Test","Bkg")):
-            test_torch_batch = bm.get_torch_batch(test_sample)
-            X,Y = test_torch_batch[0], test_torch_batch[1]
-            _X = X.data.numpy()
-            _Y = Y.data.numpy()
-            # if len(test_torch_batch) > 2: spec = test_torch_batch[2]            
-            print('Evaluating on validation saample')
-            _P_list=[]
-            for batch in DataLoader(X, batch_size=250):
-                P_appo  = model(batch)
-                _P_appo = P_appo.data.numpy()
-                _P_list.append(_P_appo)
-            #FIXME, think about many bm plots
-            _P = np.vstack(_P_list)
-            flatdict = {}
+        test_torch_batch = self.bm.get_torch_batch(test_sample)
+        X,Y = test_torch_batch[0], test_torch_batch[1]
+        _X = X.data.numpy()
+        _Y = Y.data.numpy()
+        # if len(test_torch_batch) > 2: spec = test_torch_batch[2]            
+        print('Evaluating on validation saample')
+        _P_list=[]
+        for batch in DataLoader(X, batch_size=250):
+            P_appo  = model(batch)
+            _P_appo = P_appo.data.numpy()
+            _P_list.append(_P_appo)
+        #FIXME, think about many bm plots
+        _P = np.vstack(_P_list)
+        flatdict = {}
 
-            if self.args.nscalars:
-                _X = _X[:,:-self.args.nscalars]
-            _X = _X.reshape(X.shape[0],self.args.jets+self.args.extras,4+self.args.nextrafields)
+        if self.args.nscalars:
+            _X = _X[:,:-self.args.nscalars]
+        _X = _X.reshape(X.shape[0],self.args.jets+self.args.extras,4+self.args.nextrafields)
 
         # Write results to file with analysis-specific function
         if args.write_output:
