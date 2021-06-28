@@ -3,7 +3,7 @@ zero_jets=2
 eos_h5='/eos/user/c/crizzi/RPV/alpaca/h5/mio/FT_022621/'
 tag='alpaca_'${njets}'j_hydra_3layers_UDS_1400_partonindex'
 spectators=' --spectators n_jets --spectators event_number --spectators weight --spectators has_good_match --spectators jet_isGluon --spectators jet_isSig'
-extra='--extra-jet-fields partonindex2'
+extra=''
 #extra='--extra-jet-fields jet_isSig --extra-jet-fields jet_isGluon'
 
 alpaca gluglu --input-file ${eos_h5}truthmatched_gluino_truth_UDS_1400_mymatch_train.h5 --test-sample 1000 -w  --tag ${tag} --output-dir /eos/user/c/crizzi/RPV/alpaca/results/ --hydra --fflayer 200 200 200 --zero-jets ${zero_jets} --jets ${njets} -t ${spectators} ${extra}
