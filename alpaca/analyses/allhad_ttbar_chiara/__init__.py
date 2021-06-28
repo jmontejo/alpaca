@@ -34,8 +34,7 @@ class MainTtbarChiara(BaseMain):
 
     def __init__(self, args):
         super().__init__(args)
-        self.train_bm = BatchManagerTtbarChiara(args)
-        self.test_bm  = []
+        self.bm = BatchManagerTtbarChiara(args)
 
     def plots(self):
         log.warning("No plots for MainTtbarChiara")
