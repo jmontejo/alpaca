@@ -61,6 +61,8 @@ def cli():
                         help='path to the output directory')
     sharedparser.add_argument('--tag', default='alpaca',
                         help='tag the output')
+    sharedparser.add_argument('--sample-name', default='Test',
+                        help='Sample name in the output npz')
 
     sharedparser.add_argument('--input-files', '-i', required=True, type=Path,
                         action='append',

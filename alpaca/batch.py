@@ -31,17 +31,14 @@ class BatchManager:
             df[self.internal_category_name] = category
             df = df.replace(True, 1)
             df = df.replace(False, 0)
-            print('shape',df.shape[0])
-            #if category == 0:
-            #    print('category 0')
-            #    keep_index = np.random.random(df.shape[0]) < 0.1
-            #    df = df[keep_index]
-            print('new shape',df.shape[0])
 
+            args.current = (input_path, category)
             jets, extras, scalars, labels, spectators = self.get_objects(
                 df, args,
                 **kwargs
             )
+            if args.input_categories:
+                labels = BatchManager.get_event_labels(df, args.ncategories)
 
             if jets is not None: tmp_jets.append(jets)
             if extras is not None: tmp_extras.append(extras)

@@ -101,6 +101,22 @@ class BaseMain:
             log.debug('Finished training')
             torch.save(model, param_file )
 
+
+            test_torch_batch = self.bm.get_torch_batch(test_sample, 0)
+            X, Y = test_torch_batch[0], test_torch_batch[1]            
+            P = model(X).data.numpy()
+            Y = Y.reshape(-1, args.totaloutputs).data.numpy()
+            for i,cat in enumerate(args.categories):
+                Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
+                Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
+                self.losses["ROC_"+cat] = 0
+                for ijet in range(self.args.jets):
+                #for ijet in [0]:
+                    if(len(Yi[0]==ijet)): break
+                    self.losses["ROC_"+cat] += get_roc_auc(Pi[:,ijet],Yi[:,ijet])
+                self.losses["ROC_"+cat]     = [self.losses["ROC_"+cat]/self.args.jets for x in self.losses[cat]]
+
+
             fig = plt.figure()
             for losstype, lossvals in self.losses.items():
                 plt.plot(lossvals, label=losstype)
@@ -137,6 +153,16 @@ class BaseMain:
         if self.args.nscalars:
             _X = _X[:,:-self.args.nscalars]
         _X = _X.reshape(X.shape[0],self.args.jets+self.args.extras,4+self.args.nextrafields)
+
+        flatdict["jets_{}".format(args.sample_name)] = _X #.data.numpy()
+        for i,cat in enumerate(args.categories):
+            print(cat)
+            Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
+            Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
+            # Flatten & save numpy arrays
+            flatdict["pred_{}_{}".format(cat, args.sample_name)] = Pi
+            flatdict["truth_{}_{}".format(cat, args.sample_name)] = Yi
+        np.savez(str(output_dir / "data.npz"), **flatdict)
 
         # Write results to file with analysis-specific function
         if args.write_output:
