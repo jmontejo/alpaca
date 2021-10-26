@@ -1,5 +1,5 @@
 import logging
-
+import pandas
 import importlib
 import pkgutil
 from pathlib import Path
@@ -123,11 +123,12 @@ def cli():
         c = int(args.outputs)
         args.outputs =  [1]*c
     except ValueError:
-        args.outputs = [int(x.lower().replace("n",str(args.jets))) for x in args.outputs.split(",")]
+        args.outputs = [int(pandas.eval(x.lower().replace("n",str(args.jets)))) for x in args.outputs.split(",")]
 
     args.totaloutputs = sum(args.outputs)
     args.nscalars = len(args.scalars)
     args.nextrafields = len(args.extra_jet_fields)
+    args.totallabels = args.totaloutputs / args.multi_class
 
     try:
         c = int(args.categories)

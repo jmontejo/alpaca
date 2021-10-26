@@ -171,7 +171,7 @@ class BatchManager:
         expected_jets = args.jets
         expected_jet_comp = 4+len(args.extra_jet_fields)
         expected_extras = args.extras
-        expected_labels = args.totaloutputs
+        expected_labels = args.totallabels
 
         obs_jets = self._jets.shape[1] if objs_njets else 0
         obs_jet_comp = self._jets.shape[2] if objs_njets else expected_jet_comp

@@ -88,7 +88,11 @@ class BaseMain:
                 for i,cat in enumerate(args.categories):
                     Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
                     Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
-                    loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi)
+                    if args.multi_class:
+                        criterion = torch.nn.CrossEntropyLoss()
+                        loss[cat] = criterion(Pi, Yi)
+                    else:
+                        loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi)
                     # give more weight to signal events
                     #weight = Yi*9 + 1
                     #loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi, weight=weight)
@@ -141,8 +145,7 @@ class BaseMain:
         # Write results to file with analysis-specific function
         if args.write_output:
             self.write_output(test_torch_batch, _P)
-
-        if True or not args.no_truth: # Only for samples for which I have truth inf
+        if not args.no_truth: # Only for samples for which I have truth inf
             for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
                 Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
                 Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
