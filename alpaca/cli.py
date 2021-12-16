@@ -128,7 +128,7 @@ def cli():
     args.totaloutputs = sum(args.outputs)
     args.nscalars = len(args.scalars)
     args.nextrafields = len(args.extra_jet_fields)
-    args.totallabels = args.totaloutputs / args.multi_class
+    args.totallabels = int(args.totaloutputs / args.multi_class)
 
     try:
         c = int(args.categories)

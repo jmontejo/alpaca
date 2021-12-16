@@ -82,21 +82,25 @@ class BaseMain:
                 train_torch_batch = self.bm.get_torch_batch(batch_size, start_index=i * batch_size + test_sample)
                 X, Y = train_torch_batch[0], train_torch_batch[1]  
                 P = model(X)
-                Y = Y.reshape(-1, args.totaloutputs)
+                Y = Y.reshape(-1, args.totallabels)
                 
                 loss = {'total':0}
-                for i,cat in enumerate(args.categories):
-                    Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
-                    Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
-                    if args.multi_class:
-                        criterion = torch.nn.CrossEntropyLoss()
-                        loss[cat] = criterion(Pi, Yi)
-                    else:
+                
+                if args.multi_class > 1:
+                    Y_mclass = Y.flatten().type(torch.LongTensor)
+                    P_mclass = P.reshape(-1,args.multi_class)
+                    criterion = torch.nn.CrossEntropyLoss()
+                    loss['total'] = criterion(P_mclass, Y_mclass)
+
+                else:
+                    for i,cat in enumerate(args.categories):
+                        Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
+                        Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
                         loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi)
-                    # give more weight to signal events
-                    #weight = Yi*9 + 1
-                    #loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi, weight=weight)
-                    loss['total'] += loss[cat]
+                        # give more weight to signal events
+                        #weight = Yi*9 + 1
+                        #loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi, weight=weight)
+                        loss['total'] += loss[cat]
 
                 for key, val in loss.items():
                     self.losses[key].append(float(val))
@@ -128,15 +132,27 @@ class BaseMain:
         _X = X.data.numpy()
         _Y = Y.data.numpy()
         # if len(test_torch_batch) > 2: spec = test_torch_batch[2]            
-        print('Evaluating on validation saample')
+        print('Evaluating on validation sample')
         _P_list=[]
         for batch in DataLoader(X, batch_size=250):
             P_appo  = model(batch)
-            _P_appo = P_appo.data.numpy()
+            # normalize _P for multiclass classification
+            if self.args.multi_class > 1:
+                n_batch = 250
+                n_class = self.args.multi_class
+                P_appo = P_appo.reshape(n_batch, self.args.jets, self.args.multi_class)
+                P_softmax = torch.nn.functional.log_softmax(P_appo, dim = 2)
+                P_softmax = P_softmax.reshape(n_batch, -1)
+                _P_appo = P_softmax.data.numpy()
+            else:
+                _P_appo = P_appo.data.numpy()
+            print('_P_appo shape: ', _P_appo.shape)
             _P_list.append(_P_appo)
         #FIXME, think about many bm plots
         _P = np.vstack(_P_list)
+        print('_P shape: ', _P.shape)
         flatdict = {}
+
 
         if self.args.nscalars:
             _X = _X[:,:-self.args.nscalars]
@@ -146,9 +162,24 @@ class BaseMain:
         if args.write_output:
             self.write_output(test_torch_batch, _P)
         if not args.no_truth: # Only for samples for which I have truth inf
+            # print out a few events here
+            # print(_Y[:5])
+            # print(_P[:5])
             for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
                 Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
-                Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
+                
+                # redefine Yi
+                if args.multi_class > 1:
+                    n_class = args.multi_class
+                    n_jet = args.jets
+                    Yi = np.tile(_Y,n_class)
+                    for class_i in range(n_class):
+                        start = class_i*n_jet
+                        Yi[:,start:start+n_jet] = (_Y == class_i).astype('int')
+                    Yi = Yi[:,self.boundaries[i] : self.boundaries[i+1]]
+                else:
+                    Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
+
 
                 for ijet in range(jets):
 

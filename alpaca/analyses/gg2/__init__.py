@@ -30,7 +30,7 @@ def register_cli(subparser, parentparser):
     parser.add_argument('--no-truth', action='store_true')
     parser.add_argument('--jet-pT-threshold', type=float, default=0.0, help='Add a threshold to jet selection.')
     parser.add_argument('--first-jet-gluino', action='store_true', help='Assume th efirst jet is a gluino jet. If true, set --outputs "N-1,5,6"')
-    parser.add_argument('--multi-class', action='store_true', help='Use multiclass classification. If true, set --outputs "N-1,5,6"')
+    parser.add_argument('--multi-class', type=int, default=1, help='Use multiclass classification. If there are 3 classes, set --outputs "N,N,N"')
 
     # set as mutually exclusive to plan for other possibilities (e.g. divide by HT)
     scalechoice = parser.add_mutually_exclusive_group()
@@ -66,7 +66,12 @@ class MainGluGlu(BaseMain):
                 df_X[s]=spec[:,i]
         if Y.shape[1] > 1:
             if self.args.first_jet_gluino:
-                col_P = ['from_top_'+str(j) for j in range(self.args.jets-1)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
+                if self.args.multi_class > 1:
+                    col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['is_lead_'+str(j) for j in range(self.args.jets)]+['is_sublead_'+str(j) for j in range(self.args.jets)]
+                else:
+                    col_P = ['from_top_'+str(j) for j in range(self.args.jets-1)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
+            elif self.args.multi_class > 1:
+                col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['is_lead_'+str(j) for j in range(self.args.jets)]+['is_sublead_'+str(j) for j in range(self.args.jets)]
             else:
                 col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
         else:
@@ -76,7 +81,10 @@ class MainGluGlu(BaseMain):
         if self.args.no_truth:
             df_test = pd.concat([df_X, df_P], axis=1, sort=False)
         else:
-            col_Y = [p+'_true' for p in col_P]
+            if self.args.multi_class > 1:
+                col_Y = ['category_'+str(j) for j in range(self.args.jets)]
+            else:
+                col_Y = [p+'_true' for p in col_P]
             df_Y = pd.DataFrame(data = _Y, columns=col_Y)    
             df_test = pd.concat([df_X, df_P, df_Y], axis=1, sort=False)
         
@@ -104,7 +112,8 @@ class BatchManagerGluGlu(BatchManager):
         if args.train: use_truth=True
 
         # FIXME: pass these as arguments
-        all_partons_included=False
+        # all_partons_included = False
+        all_partons_included = not args.not_all_partons
         qcd_like=False
 
         tot_jets_per_event = len(df['jet_e'].columns.get_level_values('subentry'))
@@ -235,12 +244,20 @@ class BatchManagerGluGlu(BatchManager):
             #    self._jetlabels = np.zeros((len(jets),jets_per_event+11))
             #    return
 
-            if args.multi_class:
+            if args.multi_class > 1:
+                jetfromttbar = labels > 0
+                maskedlabels = np.ma.masked_where(jetfromttbar == False, labels)
+                nonisrlabels = maskedlabels.compressed().reshape(-1,6)
+                first_gjet_mask = nonisrlabels[:,0]<4
+                print('jetfromttbar shape: ', jetfromttbar.shape)
+                print('maskedlabels shape: ', maskedlabels.shape)
+                print('nonisrlabels shape: ', nonisrlabels.shape)
+                gjet_mask = np.tile(first_gjet_mask[:,np.newaxis],(1,jets_per_event))
+                jet_cat_mask = np.where(gjet_mask,np.logical_and(labels>0, labels<4), labels>3)
                 jetlabels = np.copy(labels)
-                leading_mask=np.logical_and(jetlabels>0, jetlabels<4)
-                jetlabels[leading_mask] = 1
-                jetlabels[labels>3] = 2
-                jetlabels[:,0]=1
+                jetlabels[jet_cat_mask] = 1
+                jetlabels[np.logical_and(np.logical_not(jet_cat_mask),labels!=0)] = 2
+                jetlabels.astype('int')
 
             else:
                 # Convert the parton labels to bools that the network can make sense of
@@ -282,11 +299,16 @@ class BatchManagerGluGlu(BatchManager):
             # conform to the expectations we have for training, 6 top jets, 2 more
             # to complete top1 and 2 b-jets.
             def good_labels(r,all_partons_included):
+                if args.multi_class > 1 : 
+                    return ((r==1).sum() == (2 if args.first_jet_gluino else 3)) and \
+                        ((r==2).sum() == 3)
+
                 if not all_partons_included: return True
                 if qcd_like: return True
                 
                 njets = labeledjets.shape[1]
-                if first_jet_gluino:
+
+                if args.first_jet_gluino:
                     return (r[:njets-1].sum() == 5) and \
                         (r[njets-1:njets+5-1].sum() == 2) and \
                         (r[njets+5-1:].sum() == 2)
