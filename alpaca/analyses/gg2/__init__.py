@@ -66,9 +66,9 @@ class MainGluGlu(BaseMain):
                 df_X[s]=spec[:,i]
         if Y.shape[1] > 1:
             if self.args.first_jet_gluino:
-            if self.args.multi_class > 1:
-                col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['is_lead_'+str(j) for j in range(self.args.jets)]+['is_sublead_'+str(j) for j in range(self.args.jets)]
-            else:
+                if self.args.multi_class > 1:
+                    col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['is_lead_'+str(j) for j in range(self.args.jets)]+['is_sublead_'+str(j) for j in range(self.args.jets)]
+                else:
                     col_P = ['from_top_'+str(j) for j in range(self.args.jets-1)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
             elif self.args.multi_class > 1:
                 col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['is_lead_'+str(j) for j in range(self.args.jets)]+['is_sublead_'+str(j) for j in range(self.args.jets)]
