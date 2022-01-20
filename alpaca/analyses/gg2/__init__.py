@@ -258,6 +258,8 @@ class BatchManagerGluGlu(BatchManager):
                 jetlabels[jet_cat_mask] = 1
                 jetlabels[np.logical_and(np.logical_not(jet_cat_mask),labels!=0)] = 2
                 jetlabels.astype('int')
+                if args.first_jet_gluino:
+                    jetlabels = np.delete(jetlabels, 0, 1)
 
             else:
                 # Convert the parton labels to bools that the network can make sense of

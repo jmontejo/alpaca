@@ -123,35 +123,38 @@ class BaseMain:
                 model = torch.load(param_file)
             else:
                 log.error("Running without training but the model file {} is not present".format(param_file))
-        model.eval()
-        #def plots(self): ## should store the NN and then do the plotting as a separate step
-        output_dir = self.get_output_dir()
-        # Run for performance
-        test_torch_batch = self.bm.get_torch_batch(test_sample)
-        X,Y = test_torch_batch[0], test_torch_batch[1]
-        _X = X.data.numpy()
-        _Y = Y.data.numpy()
-        # if len(test_torch_batch) > 2: spec = test_torch_batch[2]            
-        print('Evaluating on validation sample')
-        _P_list=[]
-        for batch in DataLoader(X, batch_size=250):
-            P_appo  = model(batch)
-            # normalize _P for multiclass classification
-            if self.args.multi_class > 1:
-                n_batch = 250
-                n_class = self.args.multi_class
-                P_appo = P_appo.reshape(n_batch, self.args.jets, self.args.multi_class)
-                P_softmax = torch.nn.functional.log_softmax(P_appo, dim = 2)
-                P_softmax = P_softmax.reshape(n_batch, -1)
-                _P_appo = P_softmax.data.numpy()
-            else:
-                _P_appo = P_appo.data.numpy()
-            print('_P_appo shape: ', _P_appo.shape)
-            _P_list.append(_P_appo)
-        #FIXME, think about many bm plots
-        _P = np.vstack(_P_list)
-        print('_P shape: ', _P.shape)
-        flatdict = {}
+
+        with torch.no_grad():
+            model.eval()
+            #def plots(self): ## should store the NN and then do the plotting as a separate step
+            output_dir = self.get_output_dir()
+            # Run for performance
+            test_torch_batch = self.bm.get_torch_batch(test_sample)
+            X,Y = test_torch_batch[0], test_torch_batch[1]
+            _X = X.data.numpy()
+            _Y = Y.data.numpy()
+            # if len(test_torch_batch) > 2: spec = test_torch_batch[2]            
+            print('Evaluating on validation sample')
+            _P_list=[]
+            for batch in DataLoader(X, batch_size=250):
+                P_appo  = model(batch)
+                # normalize _P for multiclass classification
+                if self.args.multi_class > 1:
+                    n_batch = 250
+                    n_class = self.args.multi_class
+                    P_appo = P_appo.reshape(n_batch, self.args.jets, self.args.multi_class)
+                    P_softmax = torch.nn.functional.softmax(P_appo, dim = 2)
+                    P_softmax = np.swapaxes(P_softmax,1,2)
+                    P_softmax = P_softmax.reshape(n_batch, -1)
+                    _P_appo = P_softmax.data.numpy()
+                else:
+                    _P_appo = P_appo.data.numpy()
+                print('_P_appo shape: ', _P_appo.shape)
+                _P_list.append(_P_appo)
+            #FIXME, think about many bm plots
+            _P = np.vstack(_P_list)
+            print('_P shape: ', _P.shape)
+            flatdict = {}
 
 
         if self.args.nscalars:
