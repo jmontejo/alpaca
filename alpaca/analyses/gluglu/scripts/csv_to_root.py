@@ -19,7 +19,7 @@ def options():
     parser.add_argument('--merged-df-root',     default='merged_df_test.root',        help="Merged df name when stored as TTree")
     parser.add_argument('--output-tree',     default='tree',        help="Merged df name")
     parser.add_argument('--build-df',    action='store_true' ,       help="Create the merged dataframe and store it as root file")
-    parser.add_argument('--pt-order',    action='store_true' ,       help="Order tops by pT")
+    parser.add_argument('--pt-order',    action='store_true' ,       help="Order gluinos by pT when naming them g1 and g2")
     parser.add_argument('--train-sample',    action='store_true' ,       help="Look at the group of root files corresponding to trainine sample")
     parser.add_argument('--no-input-root',    action='store_true' ,       help="Do not add the information in the original ROOT file")
     parser.add_argument('--no-truth',    action='store_true' ,       help="Do not add the information in the alpaca file with truth info")

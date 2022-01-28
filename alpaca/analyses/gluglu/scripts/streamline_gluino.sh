@@ -25,13 +25,5 @@ do
  done
 
 cmd="python plot_overtraining.py --file-train ${folder}/outputtree_train.root --file-test ${folder}/outputtree_test.root -o ."
-#echo ${cmd}
-#${cmd}
-
-cmd="python3 csv_to_root.py --build-df --merged-df ${folder}/merged_csv_dijet_MBJ.csv --merged-df-root ${folder}/merged_csv_dijet_MBJ.root --input-alpaca-no-truth ${folder}/NNoutput_dijet_MBJ.csv --pt-order --output ${folder}/outputtree_dijet_MBJ.root --no-input-root ${csv_to_root_options} --no-truth --weights weight_lumi weight_mc"
-#echo ${cmd}
-#${cmd}
-
-cmd="python3 plot_top_MBJ.py -i ${folder}/outputtree_dijet_MBJ.root -o ${folder}/plots_dijet_MBJ"
-#echo ${cmd}
-#${cmd}
+echo ${cmd}
+${cmd}

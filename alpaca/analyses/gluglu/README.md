@@ -113,12 +113,18 @@ are possible based on the name of the process. This should be changed to be more
 events where the truth matching is possible), angular variables for the gluino system, and event-level variables. All of these variables are used to fill
 a TTree, which is then stored in a ROOT file. 
 
-Not all of these steps need to be performed all of the times, depending on the command line options.
+Not all of the above steps need to be performed all of the times, depending on the command line options.
+The full list of options is visible [here](https://gitlab.cern.ch/atlas-phys-susy-wg/RPVLL/rpvmultijet/alpaca/-/blob/master/alpaca/analyses/gluglu/scripts/csv_to_root.py#L14-30). 
 The output ROOT file can be used to produce plots (as done in the following step) but also to print the reconstruction efficiency.
 An example of computation of the reconstruction efficiency is shown in [reco_eff.py](./scripts/reco_eff.py). This uses the correctness of the
 matching computed in [csv_to_root.py](./scripts/csv_to_root.py), which is based on the comparison of the resulting invariant mass. 
 
-[plot_gluino.py](./scripts/plot_gluino.py) 
+The script [plot_gluino.py](./scripts/plot_gluino.py) takes as input the ROOT file mentioned above, and
+produces plots to compare the mass distributions. The only two arguments are `--input-file` and `--output-folder`. 
+
+[streamline_gluino.sh](./scripts/streamline_gluino.sh) also calls the script [plot_overtraining.py](./scripts/plot_overtraining.py), which
+compares the mass distribution in the signal in the training and validation sets. A significant difference in the mass distribution could
+be consequence of overtraining. 
 
 
 
