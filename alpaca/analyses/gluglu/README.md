@@ -100,5 +100,25 @@ This script performs two main steps, achieved by calling two python scripts: [cs
 [plot_gluino.py](./scripts/plot_gluino.py). 
 
 
+[csv_to_root.py](./scripts/csv_to_root.py) reads the csv file output of alpaca, computes the interesting quantities and
+produces an output ROOT file containing all the information.
+Most of the relevant information can be given with command line options, with the notable exception of the FactoryTools file (see below). 
+The operations performed are:
+
+* The information from the csv files with output from alpaca, from the file with the information ont he truth matching (for the events
+where the truth matching is possible) and from the FactoryTools ntuples is turned into pandas dataframes, which are merged (function `build_and_store_df`)
+* **Note**: the name of the input ROOT file from FactoryTools is hardcoded, and only three options
+are possible based on the name of the process. This should be changed to be more flexible. 
+* In the function `build_tree`, several interesting variables are computed, including the reconstructed gluino masses, the truth masses (for the signal
+events where the truth matching is possible), angular variables for the gluino system, and event-level variables. All of these variables are used to fill
+a TTree, which is then stored in a ROOT file. 
+
+Not all of these steps need to be performed all of the times, depending on the command line options.
+The output ROOT file can be used to produce plots (as done in the following step) but also to print the reconstruction efficiency.
+An example of computation of the reconstruction efficiency is shown in [reco_eff.py](./scripts/reco_eff.py). This uses the correctness of the
+matching computed in [csv_to_root.py](./scripts/csv_to_root.py), which is based on the comparison of the resulting invariant mass. 
+
+[plot_gluino.py](./scripts/plot_gluino.py) 
+
 
 

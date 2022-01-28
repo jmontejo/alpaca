@@ -667,7 +667,9 @@ def build_tree(args):
             mg1_true[0] = g1_true.M()
             mg2_true[0] = g2_true.M()
             mg1g2_true[0] = (g1_true + g2_true).M()
-        
+
+            # the correctness of the matching is evaluated based on the resulting invariant mass.
+            # it could be changed to compare directly the resulting index 
             alpaca_good_mg1[0] = (round(mg1_true[0],2) == round(mg1_reco[0],2)) or (round(mg2_true[0],2) == round(mg1_reco[0],2))
             alpaca_good_mg2[0] = (round(mg2_true[0],2) == round(mg2_reco[0],2)) or  (round(mg1_true[0],2) == round(mg2_reco[0],2))
             alpaca_good_mg1g2[0] = (round(mg1g2_true[0],2) == round(mg1g2_reco[0],2))
