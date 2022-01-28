@@ -10,10 +10,21 @@ list_masses=[900,1400,2400]
 
 by_file = True
 files = [
-    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_onlyBaseline/outputtree_test.root',
-    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_isSig/outputtree_test.root',
-    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_isSig_isGluon/outputtree_test.root',
-    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_partonindex/outputtree_test.root'
+    #'/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_newtag/outputtree_test.root',
+    #'/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_newtag_isSig/outputtree_test.root',
+    #'/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_newtag_isSig_isBTag/outputtree_test.root',
+    #'/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_newtag_isBTag/outputtree_test.root',
+    #'/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDB_1400_newtag_isSig_isBTag/outputtree_test.root',
+    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_newtag_noisbpred/outputtree_900.root',
+    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_newtag_noisbpred/outputtree_test.root',
+    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_newtag_noisbpred/outputtree_2400.root',
+    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_newtag_noisbpred_htscale/outputtree_900.root',
+    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_newtag_noisbpred_htscale/outputtree_test.root',
+    '/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_newtag_noisbpred_htscale/outputtree_2400.root',
+    #'/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_onlyBaseline/outputtree_test.root',
+    #'/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_isSig/outputtree_test.root',
+    #'/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_isSig_isGluon/outputtree_test.root',
+    #'/eos/user/c/crizzi/RPV/alpaca/results/alpaca_8j_hydra_3layers_UDS_1400_partonindex/outputtree_test.root'
 ]
 
 def print_eff(tree, jet_sel,max_jet, has_mg1g2=True):
@@ -78,6 +89,7 @@ if by_mass:
 
 if by_file:
     for ifile,infile_name in enumerate(files):
+        print(infile_name)
         infile = ROOT.TFile.Open(infile_name,"READ")
         tree = infile.Get("tree")    
         #jet_sel = ['njets=='+str(ij) for ij in range(6,max_jet)] + ['njets>='+str(max_jet),'njets>=5']

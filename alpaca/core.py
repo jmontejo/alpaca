@@ -53,7 +53,7 @@ class BaseMain:
 
     def run(self):
         args = self.args
-        test_sample = args.test_sample if args.test_sample >= 0 else self.bm.get_nr_events()//10
+        test_sample = args.test_sample if args.test_sample >= 0 else self.bm.get_nr_events()
         output_dir = self.get_output_dir()
         output_dir.mkdir(parents=True, exist_ok=True)
         param_file = output_dir / 'NN.pt'
@@ -84,10 +84,10 @@ class BaseMain:
                 P = model(X)
                 Y = Y.reshape(-1, args.totaloutputs)
                 
-                loss = {'total':0}
+                loss = {'total':0}                
                 for i,cat in enumerate(args.categories):
                     Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
-                    Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
+                    Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]                    
                     loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi)
                     # give more weight to signal events
                     #weight = Yi*9 + 1
@@ -119,6 +119,7 @@ class BaseMain:
         #def plots(self): ## should store the NN and then do the plotting as a separate step
         output_dir = self.get_output_dir()
         # Run for performance
+        print("test sample:" , test_sample)
         test_torch_batch = self.bm.get_torch_batch(test_sample)
         X,Y = test_torch_batch[0], test_torch_batch[1]
         _X = X.data.numpy()
@@ -136,13 +137,13 @@ class BaseMain:
 
         if self.args.nscalars:
             _X = _X[:,:-self.args.nscalars]
-        _X = _X.reshape(X.shape[0],self.args.jets+self.args.extras,4+self.args.nextrafields)
+        _X = _X.reshape(X.shape[0],self.args.jets+self.args.extras,4+self.args.nextrafields)        
 
         # Write results to file with analysis-specific function
         if args.write_output:
             self.write_output(test_torch_batch, _P)
 
-        if True or not args.no_truth: # Only for samples for which I have truth inf
+        if not args.no_truth: # Only for samples for which I have truth inf
             for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
                 Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
                 Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]

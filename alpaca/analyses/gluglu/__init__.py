@@ -16,10 +16,11 @@ def register_cli(subparser, parentparser):
     analysis_defaults = {
         "Main"       : MainGluGlu, #no quotes, pointer to the class
         "extras"     : 0,
-        "outputs"    : "n,5,6",
+        #"outputs"    : "n,5,6", # chiara: remove is_b
+        "outputs"    : "n,5", 
         "jets"       : 7,
         "zero_jets"  : 1,
-        "categories" : 3,
+        "categories" : 2,
         "extra_jet_fields" : [],
     }
 
@@ -60,8 +61,12 @@ class MainGluGlu(BaseMain):
         if len(torch_batch) > 2:
             for i,s in enumerate(self.args.spectators):
                 df_X[s]=spec[:,i]
+            if self.args.scale_e:
+                df_X['scale_e'] = spec[:,len(self.args.spectators)]
         if Y.shape[1] > 1:
-            col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
+            # chiara: remove is_b
+            #col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
+            col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['same_as_lead_'+str(j) for j in range(5)]
         else:
             col_P = ['tagged']
         print("Y")
@@ -173,6 +178,10 @@ class BatchManagerGluGlu(BatchManager):
             jet_px = jet_px/sum_jet_e
             jet_py = jet_py/sum_jet_e
             jet_pz = jet_pz/sum_jet_e
+            spectators.append(sum_jet_e.flatten())
+
+        for s in spectators:
+            print(s.shape)
 
         #print('jet_e')
         #print(jet_e)
@@ -214,7 +223,7 @@ class BatchManagerGluGlu(BatchManager):
             labels = labels.values.reshape(len(labels),1)
             print(labels.shape)
             #print(labels)
-            spectators_formatted = np.vstack(spectators).T if(len(args.spectators)>0) else None
+            spectators_formatted = np.vstack(spectators).T if(len(args.spectators)>0 or args.scale_e) else None
             return jets,None,None, labels, spectators_formatted
 
         # if we arrive here, we are doing event reconstruction
@@ -240,8 +249,10 @@ class BatchManagerGluGlu(BatchManager):
                     nonisrlabels[ia] = np.append(nonisrlabels[ia], [0 for i in range(6-a.shape[0])] )
             nonisrlabels = np.array(nonisrlabels)
             topmatch = np.array([r > 3 if r[0] > 3 else r <= 3 for r in nonisrlabels])
-            isbjet = np.array([np.equal(r, 1) | np.equal(r, 4) for r in nonisrlabels])
-            jetlabels = np.concatenate([jetfromttbar, topmatch[:, 1:], isbjet], 1)
+            # chiara: remove isbjet
+            #isbjet = np.array([np.equal(r, 1) | np.equal(r, 4) for r in nonisrlabels])
+            #jetlabels = np.concatenate([jetfromttbar, topmatch[:, 1:], isbjet], 1)
+            jetlabels = np.concatenate([jetfromttbar, topmatch[:, 1:]], 1)
 
             # Substitute this line for the preceding if only doing the 6 top jets
             # Not currently configurable by command line because it's a bit more
@@ -262,8 +273,7 @@ class BatchManagerGluGlu(BatchManager):
                 
                 njets = labeledjets.shape[1]
                 return (r[:njets].sum() == 6) and \
-                    (r[njets:njets+5].sum() == 2) and \
-                    (r[njets+5:].sum() == 2)
+                    (r[njets:njets+5].sum() == 2)
 
             select_clean = np.array([good_labels(r,all_partons_included) for r in jetlabels])
             # print('clean shape:',jets[select_clean].shape)
@@ -275,12 +285,12 @@ class BatchManagerGluGlu(BatchManager):
             spectators_clean = []
             for s in spectators:
                 spectators_clean.append(s[select_clean])            
-            spectators_formatted_clean = np.vstack(spectators_clean).T if(len(args.spectators)>0) else None
+            spectators_formatted_clean = np.vstack(spectators_clean).T if(len(args.spectators)>0 or args.scale_e) else None
             return jets_clean,None,None, jetlabels_clean, spectators_formatted_clean
 
         else:
             jetlabels = np.zeros((jets.shape[0], 2))
-            spectators_formatted = np.vstack(spectators).T if(len(args.spectators)>0) else None
+            spectators_formatted = np.vstack(spectators).T if(len(args.spectators)>0 or args.scale_e) else None
             return jets,None,None, jetlabels, spectators_formatted
  
 
