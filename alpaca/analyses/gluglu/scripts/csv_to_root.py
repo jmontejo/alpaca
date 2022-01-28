@@ -722,6 +722,7 @@ def main():
         files_FT=['/eos/user/c/crizzi/RPV/ntuples/ttbar_will/output/top.root']
     else:
         files_FT=['/eos/user/c/crizzi/RPV/ntuples/FT_signal_020321_merged/mc16e/signal/504539.root']
+        files_FT=['504539.root']
     print('chiara: file')
     print(files_FT)
 

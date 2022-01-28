@@ -3,7 +3,8 @@
 csv_to_root_options=$1
 tag=$2
 
-alpaca_dir="/eos/user/c/crizzi/RPV/alpaca/results"
+#alpaca_dir="/eos/user/c/crizzi/RPV/alpaca/results"
+alpaca_dir="../../../../../results"
 folder=${alpaca_dir}/${tag}
 for sample in 'train' 'test' '900' '2400' #'train' #'test' #"test_mg2400_mymatch" "test_mg900_mymatch"
 do 

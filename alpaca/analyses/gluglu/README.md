@@ -80,11 +80,17 @@ In this case, the training is performed using both signal and background samples
 
 ## Visualize the Results
 
+**TO DO** this setup instructions do not work. There are conflicts with the alpaca conda packages. Need
+to write instructions to make a separate environment. 
+
+
 Note on the technical setup: On top of the packages needed to run alpaca, this steps requires also ROOT.
 You can add the needed packages to your environment:
 ```
 conda install -c conda-forge root
 conda install -c conda-forge root_pandas
+conda install -c conda-forge uproot
+conda install -c anaconda progressbar2
 ```
 This needs to be done only once. 
 
