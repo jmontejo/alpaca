@@ -43,9 +43,10 @@ This script performs:
 
 The main command is `alpaca gluglu` to run the `gluglu` analysis in alpaca, followed by the command line arguments.
 The most important arguments are:
-* `--input-file`: h5 file with the input
-* `-t`: perform the training
-* `-w`:
+* `--input-file`, `-i`: h5 file with the input. **Note**: it can be called several times to consider multiple files, e.g. in the case of training on multiple
+masses simultaneously. 
+* `--train`, `-t`: perform the training
+* `--write-output`, `-w`: store the result of the evaluation on the test sample
 * `--hydra`: use the hydra architecture. Other options are `--simple-nn` and `--cola-lola`
 * `--fflayer`: architecture of the feed forward layer. E.g. if 200 200 200, we'll have three layers with 200 nodes each. 
 * `--test-sample`: how many events of that file should be used for the validation during the training.
@@ -61,13 +62,42 @@ still reconstruct the gluino also with just 6 jets, so we would set `--zero-jets
 * `--label-roc`: additional label for the ROC curve plot
 
 Other options are visible in [cli.py](../../cli.py) (e.g. shuffle jets, per-jet training, ...).
+An interesting option not used in the example script is `--extra-jet-fields`, to include in the training extra per-jet variables (e.g. quark-gluon tagging, b-tagging, ...).
 
 ### Train for Signal vs QCD Discrimination
+
+The same architectures that can be used for gluino reconstructions, can be used also for signal vs background training.
+In the code, this is corresponds simply to changing the structure of the target vector. From the command line, this can
+be achieved simply by including several input files, and adding a cagory for each (this is done with the option `--input-categories`, `-ic`).
+E.g.:
+```
+alpaca gluglu -i signal.h5 -ic 1 -i qcd.h5 -ic 0 ... 
+```
+Examples of this usage are presented in the scripts [run_gluglu_sig_bkg_NN.sh](./scripts/run_gluglu_sig_bkg_NN.sh)
+and [run_gluglu_sig_bkg.sh](./scripts/run_gluglu_sig_bkg.sh), that use a simple NN and the cola-lola architecture respectively 
 
 In this case, the training is performed using both signal and background samples. 
 
 ## Visualize the Results
 
+Note on the technical setup: On top of the packages needed to run alpaca, this steps requires also ROOT.
+You can add the needed packages to your environment:
+```
+conda install -c conda-forge root
+conda install -c conda-forge root_pandas
+```
+This needs to be done only once. 
+
+The sequence of steps needed to visualize the results is reproduced in the script [streamline_gluino.sh](./scripts/streamline_gluino.sh).
+This script takes as input the number of jets used by alpaca and the name of the tag, while other important parameters that are less frequently changed
+(e.g. the location of the result folder) are hardcoded inside the script.
+An example usage is:
+```
+./streamline_gluino.sh "--jets 8" "alpaca_8j_hydra_3layers_UDS_1400_newtag_noisbpred_htscale"
+```
+
+This script performs two main steps, achieved by calling two python scripts: [csv_to_root.py](./scripts/csv_to_root.py) and
+[plot_gluino.py](./scripts/plot_gluino.py). 
 
 
 
