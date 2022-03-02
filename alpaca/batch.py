@@ -153,6 +153,8 @@ class BatchManager:
     def build_flat_arrays(self):
 
         arrays = []
+        print('extras, scalars: ', self._extras, self._scalars)
+        print('shape of jets: ', self._jets.shape)
         if self._extras is not None: arrays.append(self._extras)
         if self._jets is not None: arrays.append(self._jets)
         if self._scalars is not None:  arrays.append(self._scalars)

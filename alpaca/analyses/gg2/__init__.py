@@ -6,7 +6,7 @@ import numpy as np
 from alpaca.core import BaseMain
 from alpaca.batch import BatchManager
 
-n_jet_in_input=20 # chiara: can compute this from column names
+n_jet_in_input=8 # chiara: can compute this from column names
 
 log = logging.getLogger(__name__)
 
@@ -67,11 +67,11 @@ class MainGluGlu(BaseMain):
         if Y.shape[1] > 1:
             if self.args.first_jet_gluino:
                 if self.args.multi_class > 1:
-                    col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['is_lead_'+str(j) for j in range(self.args.jets)]+['is_sublead_'+str(j) for j in range(self.args.jets)]
+                    col_P = ['is_ISR_'+str(j) for j in range(self.args.jets-1)]+['is_lead_'+str(j) for j in range(self.args.jets-1)]+['is_sublead_'+str(j) for j in range(self.args.jets-1)]
                 else:
                     col_P = ['from_top_'+str(j) for j in range(self.args.jets-1)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
             elif self.args.multi_class > 1:
-                col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['is_lead_'+str(j) for j in range(self.args.jets)]+['is_sublead_'+str(j) for j in range(self.args.jets)]
+                col_P = ['is_ISR_'+str(j) for j in range(self.args.jets)]+['is_lead_'+str(j) for j in range(self.args.jets)]+['is_sublead_'+str(j) for j in range(self.args.jets)]
             else:
                 col_P = ['from_top_'+str(j) for j in range(self.args.jets)]+['same_as_lead_'+str(j) for j in range(5)]+['is_b_'+str(j) for j in range(6)]
         else:
@@ -82,7 +82,10 @@ class MainGluGlu(BaseMain):
             df_test = pd.concat([df_X, df_P], axis=1, sort=False)
         else:
             if self.args.multi_class > 1:
-                col_Y = ['category_'+str(j) for j in range(self.args.jets)]
+                if self.args.first_jet_gluino:
+                    col_Y = ['category_'+str(j) for j in range(self.args.jets-1)]
+                else:   
+                    col_Y = ['category_'+str(j) for j in range(self.args.jets)]
             else:
                 col_Y = [p+'_true' for p in col_P]
             df_Y = pd.DataFrame(data = _Y, columns=col_Y)    
@@ -176,6 +179,10 @@ class BatchManagerGluGlu(BatchManager):
         df_jets = df[[c for c in df.columns if c[0] not in args.spectators and ('alpaca' not in c[0] and c[1]<n_jet_in_input)]]
         n_comp = 4 + len(extra_fields) # 4 ccomponents for each jet (e, px, py, pz) plus the extra components        
         n_info_jet = n_comp if args.no_truth else n_comp+1 # if reading truth, read also parton label
+        print('extra fields: ', extra_fields)
+        print('ncomp: ', n_comp)
+        print('n_info_jet: ', n_info_jet)
+        print('n_jet_in_input: ', n_jet_in_input)
         jet_stack = np.swapaxes(df_jets.values.reshape(len(df_jets), n_info_jet, n_jet_in_input), 1, 2)
         jet_stack = jet_stack[:, :jets_per_event, :]
         #Reverse to intuitive order

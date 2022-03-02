@@ -36,9 +36,16 @@ class BaseMain:
         return self.args.output_dir / self.args.tag
 
     def get_model(self, args):
+        do_multi_class = False 
+
+        if hasattr(args,'multi_class'):
+            if args.multi_class > 1:
+                do_multi_class = True 
+
         if args.simple_nn:
             from alpaca.nn.simple import SimpleNN
-            return SimpleNN((self.args.jets+self.args.extras)*(4+self.args.nextrafields) + self.args.nscalars, self.args.totaloutputs, fflayers=args.fflayers)
+            return SimpleNN((self.args.jets+self.args.extras)*(4+self.args.nextrafields) + self.args.nscalars, self.args.totaloutputs, fflayers=args.fflayersm, do_multi_class = do_multi_class)
+
         elif args.hydra:
             from alpaca.nn.hydra import Hydra
             log.info('  FeedForwardHead intermediate layers')            
@@ -142,18 +149,19 @@ class BaseMain:
                 if self.args.multi_class > 1:
                     n_batch = 250
                     n_class = self.args.multi_class
-                    P_appo = P_appo.reshape(n_batch, self.args.jets, self.args.multi_class)
+                    if self.args.first_jet_gluino:
+                        P_appo = P_appo.reshape(n_batch, self.args.jets-1, self.args.multi_class)
+                    else:
+                        P_appo = P_appo.reshape(n_batch, self.args.jets, self.args.multi_class)
                     P_softmax = torch.nn.functional.softmax(P_appo, dim = 2)
                     P_softmax = np.swapaxes(P_softmax,1,2)
                     P_softmax = P_softmax.reshape(n_batch, -1)
                     _P_appo = P_softmax.data.numpy()
                 else:
                     _P_appo = P_appo.data.numpy()
-                print('_P_appo shape: ', _P_appo.shape)
                 _P_list.append(_P_appo)
             #FIXME, think about many bm plots
             _P = np.vstack(_P_list)
-            print('_P shape: ', _P.shape)
             flatdict = {}
 
 
@@ -176,9 +184,11 @@ class BaseMain:
                     n_class = args.multi_class
                     n_jet = args.jets
                     Yi = np.tile(_Y,n_class)
+                    end = 0
                     for class_i in range(n_class):
-                        start = class_i*n_jet
-                        Yi[:,start:start+n_jet] = (_Y == class_i).astype('int')
+                        start = end
+                        end = (start+n_jet-1 if args.first_jet_gluino else start+n_jet)
+                        Yi[:,start:end] = (_Y == class_i).astype('int')
                     Yi = Yi[:,self.boundaries[i] : self.boundaries[i+1]]
                 else:
                     Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
