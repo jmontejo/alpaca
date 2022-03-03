@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
 from math import sqrt, floor
 
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 import numpy as np
 from alpaca.plot import get_roc_auc
 
@@ -92,48 +92,55 @@ class BaseMain:
 
             validX, validY = bmtest[:]
             validY = validY.reshape(-1, args.totallabels)
+            #X,Y = bmtrain[:]
+            #weights = 1+ 9*(Y[:,:6]==0).sum(dim=1)
+            #sampler = WeightedRandomSampler(weights, len(weights))
+            #loader = DataLoader(bmtrain, batch_size=batch_size, sampler=sampler)
             loader = DataLoader(bmtrain, batch_size=batch_size)
-            for i, (X,Y) in enumerate(progressbar(loader)):
-                model.train()
-                opt.zero_grad()
-                
 
-                P = model(X)
-                Y = Y.reshape(-1, args.totallabels)
-                
-                loss = {'total':0}
-                if args.multi_class > 1:
-                    Y_mclass = Y.flatten().type(torch.LongTensor)
-                    P_mclass = P.reshape(-1,args.multi_class)
-                    criterion = torch.nn.CrossEntropyLoss()
-                    loss['total'] = criterion(P_mclass, Y_mclass)
+            for epoch in range(args.epochs):
+                log.info("Epoch: %d",epoch)
+                for i, (X,Y) in enumerate(progressbar(loader)):
+                    model.train()
+                    opt.zero_grad()
+                    
 
-                else:
-                    for i,cat in enumerate(args.categories):
-                        Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
-                        Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
-                        loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi)
-                        # give more weight to signal events
-                        #weight = Yi*9 + 1
-                        #loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi, weight=weight)
-                        loss['total'] += loss[cat]
-
-                for key, val in loss.items():
-                    self.losses[key].append(float(val))
-                loss["total"].backward()
-                opt.step()
-
-                #Validation loss
-                if i%args.validation_steps==0:
-                    model.eval()
-                    validP = model(validX)
+                    P = model(X)
+                    Y = Y.reshape(-1, args.totallabels)
+                    
+                    loss = {'total':0}
                     if args.multi_class > 1:
-                        Y_mclass = validY.flatten().type(torch.LongTensor)
-                        P_mclass = validP.reshape(-1,args.multi_class)
-                        validloss = criterion(P_mclass, Y_mclass)
+                        Y_mclass = Y.flatten().type(torch.LongTensor)
+                        P_mclass = P.reshape(-1,args.multi_class)
+                        criterion = torch.nn.CrossEntropyLoss()
+                        loss['total'] = criterion(P_mclass, Y_mclass)
+
                     else:
-                        validloss = torch.nn.functional.binary_cross_entropy(validP, validY)
-                    self.losses['validation'].append(float(validloss))
+                        for i,cat in enumerate(args.categories):
+                            Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
+                            Yi = Y[:,self.boundaries[i] : self.boundaries[i+1]]
+                            loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi)
+                            # give more weight to signal events
+                            #weight = Yi*9 + 1
+                            #loss[cat] = torch.nn.functional.binary_cross_entropy(Pi, Yi, weight=weight)
+                            loss['total'] += loss[cat]
+
+                    for key, val in loss.items():
+                        self.losses[key].append(float(val))
+                    loss["total"].backward()
+                    opt.step()
+
+                    #Validation loss
+                    if i%args.validation_steps==0:
+                        model.eval()
+                        validP = model(validX)
+                        if args.multi_class > 1:
+                            Y_mclass = validY.flatten().type(torch.LongTensor)
+                            P_mclass = validP.reshape(-1,args.multi_class)
+                            validloss = criterion(P_mclass, Y_mclass)
+                        else:
+                            validloss = torch.nn.functional.binary_cross_entropy(validP, validY)
+                        self.losses['validation'].append(float(validloss))
 
             log.debug('Finished training')
             torch.save(model, param_file )
