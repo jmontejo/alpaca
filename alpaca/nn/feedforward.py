@@ -17,5 +17,8 @@ class FeedForwardHead(torch.nn.Module):
         output = x
         for i in range(len(self.linears)):
             output = self.linears[i](output)
-            output = self.activations[i](output)
+            if self.do_multi_class and i==len(self.linears)-1:
+                pass
+            else:
+                output = self.activations[i](output)
         return output

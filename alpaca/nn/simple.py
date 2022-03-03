@@ -11,8 +11,7 @@ class SimpleNN(torch.nn.Module):
         super(SimpleNN, self).__init__()
         self.ntotal = nobjects
         self.norm = torch.nn.BatchNorm1d(self.ntotal)
-        self.head = FeedForwardHead([self.ntotal] + fflayers + [noutputs])
-        self.do_multiclass = do_multi_class
+        self.head = FeedForwardHead([self.ntotal] + fflayers + [noutputs], do_multi_class)
 
     # Jets go in, labels come out
     def forward(self, vectors):

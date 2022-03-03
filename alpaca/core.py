@@ -44,7 +44,7 @@ class BaseMain:
 
         if args.simple_nn:
             from alpaca.nn.simple import SimpleNN
-            return SimpleNN((self.args.jets+self.args.extras)*(4+self.args.nextrafields) + self.args.nscalars, self.args.totaloutputs, fflayers=args.fflayersm, do_multi_class = do_multi_class)
+            return SimpleNN((self.args.jets+self.args.extras)*(4+self.args.nextrafields) + self.args.nscalars, self.args.totaloutputs, fflayers=args.fflayers, do_multi_class = do_multi_class)
 
         elif args.hydra:
             from alpaca.nn.hydra import Hydra
@@ -156,6 +156,8 @@ class BaseMain:
             else:
                 log.error("Running without training but the model file {} is not present".format(param_file))
 
+        ####################################################################
+
         with torch.no_grad():
             model.eval()
             #def plots(self): ## should store the NN and then do the plotting as a separate step
@@ -196,6 +198,7 @@ class BaseMain:
         # Write results to file with analysis-specific function
         if args.write_output:
             self.write_output((X,Y), _P)
+
         if not args.no_truth: # Only for samples for which I have truth inf
             for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
                 Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
