@@ -29,7 +29,7 @@ class BaseMain:
         self.args = args
         from itertools import accumulate
         self.boundaries = list(accumulate([0]+args.outputs))
-        self.losses = {cat:[] for cat in ['total']+args.categories}
+        self.losses = {cat:[] for cat in ['total','validation']+args.categories}
 
 
     def get_output_dir(self):
@@ -70,21 +70,30 @@ class BaseMain:
         log.debug(self.args)
 
         log.info('Nr. of events: %s', len(self.bm))
+        self.bm.is_consistent(args)
+        log.debug('BatchManager contents is consistent')
+
+        bmtest, bmtrain = torch.utils.data.random_split(self.bm, [test_sample, len(self.bm)-test_sample])
+
 
         if args.train:
 
             model = self.get_model(args)
             opt = torch.optim.Adam(model.parameters())
-            self.bm.is_consistent(args)
-            log.debug('BatchManager contents is consistent')
 
-            nr_train = floor(sqrt(len(self.bm)-test_sample))
-            if args.fast: nr_train = int(sqrt(nr_train))
-            batch_size = nr_train
+            if args.fast:
+                indices = np.random.choice(len(bmtrain), len(bmtrain)//10, replace=False)
+                bmtrain = torch.utils.data.Subset(bmtrain, indices)
+                log.debug('Using fast, will keep only {} events'.format(len(bmtrain)))
+
+            batch_size = floor(sqrt(len(bmtrain)))
+            nr_train = batch_size
             log.info('Training: %s iterations - batch size %s', nr_train, batch_size)
 
-            loader = DataLoader(self.bm, batch_size=batch_size)
-            for X,Y in progressbar(loader):
+            validX, validY = bmtest[:]
+            validY = validY.reshape(-1, args.totallabels)
+            loader = DataLoader(bmtrain, batch_size=batch_size)
+            for i, (X,Y) in enumerate(progressbar(loader)):
                 model.train()
                 opt.zero_grad()
                 
@@ -114,12 +123,28 @@ class BaseMain:
                     self.losses[key].append(float(val))
                 loss["total"].backward()
                 opt.step()
+
+                #Validation loss
+                if i%args.validation_steps==0:
+                    model.eval()
+                    validP = model(validX)
+                    if args.multi_class > 1:
+                        Y_mclass = validY.flatten().type(torch.LongTensor)
+                        P_mclass = validP.reshape(-1,args.multi_class)
+                        validloss = criterion(P_mclass, Y_mclass)
+                    else:
+                        validloss = torch.nn.functional.binary_cross_entropy(validP, validY)
+                    self.losses['validation'].append(float(validloss))
+
             log.debug('Finished training')
             torch.save(model, param_file )
 
             fig = plt.figure()
             for losstype, lossvals in self.losses.items():
-                plt.plot(lossvals, label=losstype)
+                if losstype == 'validation':
+                    plt.plot([l*args.validation_steps for l in range(len(lossvals))], lossvals, label=losstype)
+                else:
+                    plt.plot(lossvals, label=losstype)
             plt.ylim([0,1.5])
             plt.legend(ncol=2)
             plt.figtext(0.1,0.9,self.args.tag)
