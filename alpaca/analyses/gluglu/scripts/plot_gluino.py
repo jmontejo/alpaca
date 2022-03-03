@@ -148,7 +148,7 @@ def main():
     
 
 
-    for mass in ['mt1', 'mt2']:
+    for mass in ['mg1', 'mg2']:
         # variables for all variables plotted with the same selection    
         #variables = [mass+'_chi2_nobfixed',mass+'_true']#,mass+'_chi2_nobfixed',mass+'_true']
         #variables = [mass+'_chi2_nobfixed', mass+'_chi2_bfixed', mass+'_reco']#, mass+'_random']

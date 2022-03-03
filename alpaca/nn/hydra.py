@@ -42,7 +42,7 @@ class DecayHead(torch.nn.Module):
         # This one reconstructs the decay process, taking the ISR result as input
         # Both the top decay matching and the b-tagging
         # (these seem like things that should emerge simultaneously)
-        self.head = FeedForwardHead([self.ntotal * (5+nextrafields)+nscalars] + fflayers + [11])
+        self.head = FeedForwardHead([self.ntotal * (5+nextrafields)+nscalars] + fflayers + [5])
 
     def forward(self,selected_vector, scalars=0):
         output = self.cola(selected_vector)

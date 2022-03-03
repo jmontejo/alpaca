@@ -57,6 +57,10 @@ Here's an example of usage for the SUSY RPV MJ analysis:
 alpaca gluglu -t --input-file /eos/user/c/crizzi/RPV/alpaca/h5/mio/FT_022621/truthmatched_gluino_truth_UDS_1400_mymatch_train.h5 --test-sample 1000 -w  --tag alpaca_test --output-dir /eos/user/c/crizzi/RPV/alpaca/results/ --hydra --fflayer 200 200 200 --zero-jets 2 --jets 8  --spectators n_jets --spectators event_number --spectators weight --spectators has_good_match --extra-jet-fields jet_isSig --extra-jet-fields jet_isGluon
 ```
 
+Analysis-Specific Instructions
+-----------------
+* RPV Multijet: [here](alpaca/analyses/gluglu)
+
 Package structure
 -----------------
   - `alpaca/nn/`: Contains modules defining different network architectures, e.g.:

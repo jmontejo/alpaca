@@ -4,8 +4,9 @@ import sys
 
 print('hello')
 #fname='/eos/user/c/crizzi/RPV/alpaca/h5/mio/truthmatched_gluino_truth_UDS_1400_all.h5'
-fname='/eos/user/c/crizzi/RPV/alpaca/h5/mio/truthmatched_gluino_truth_UDS_1400_train.h5'
-#fname='truthmatched_36.h5'
+#fname='/eos/user/c/crizzi/RPV/alpaca/h5/mio/truthmatched_gluino_truth_UDS_1400_train.h5'
+fname='/eos/user/c/crizzi/RPV/alpaca/h5/mio/FT_022621/truthmatched_gluino_truth_UDS_1400_mymatch_train.h5'
+#fname='/eos/user/c/crizzi/RPV/alpaca/h5/tj/truthmatched.h5'
 dfname='df'
 df = pd.read_hdf(fname, dfname)
 #df.to_csv("myh5intocsv.csv")

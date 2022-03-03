@@ -102,7 +102,6 @@ class BaseMain:
                 Y = Y.reshape(-1, args.totallabels)
                 
                 loss = {'total':0}
-                
                 if args.multi_class > 1:
                     Y_mclass = Y.flatten().type(torch.LongTensor)
                     P_mclass = P.reshape(-1,args.multi_class)
@@ -198,9 +197,6 @@ class BaseMain:
         if args.write_output:
             self.write_output((X,Y), _P)
         if not args.no_truth: # Only for samples for which I have truth inf
-            # print out a few events here
-            # print(_Y[:5])
-            # print(_P[:5])
             for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
                 Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
                 

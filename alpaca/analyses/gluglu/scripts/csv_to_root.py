@@ -19,7 +19,7 @@ def options():
     parser.add_argument('--merged-df-root',     default='merged_df_test.root',        help="Merged df name when stored as TTree")
     parser.add_argument('--output-tree',     default='tree',        help="Merged df name")
     parser.add_argument('--build-df',    action='store_true' ,       help="Create the merged dataframe and store it as root file")
-    parser.add_argument('--pt-order',    action='store_true' ,       help="Order tops by pT")
+    parser.add_argument('--pt-order',    action='store_true' ,       help="Order gluinos by pT when naming them g1 and g2")
     parser.add_argument('--train-sample',    action='store_true' ,       help="Look at the group of root files corresponding to trainine sample")
     parser.add_argument('--no-input-root',    action='store_true' ,       help="Do not add the information in the original ROOT file")
     parser.add_argument('--no-truth',    action='store_true' ,       help="Do not add the information in the alpaca file with truth info")
@@ -72,9 +72,7 @@ def build_and_store_df(args, files_FT):
                  'from_top_1_true', 'from_top_2_true', 'from_top_3_true',
                  'from_top_4_true', 'from_top_5_true',
                  'same_as_lead_0_true', 'same_as_lead_1_true', 'same_as_lead_2_true',
-                 'same_as_lead_3_true', 'same_as_lead_4_true', 'is_b_0_true',
-                 'is_b_1_true', 'is_b_2_true', 'is_b_3_true', 'is_b_4_true',
-                 'is_b_5_true']
+                 'same_as_lead_3_true', 'same_as_lead_4_true']
     for ij in range(6,20):        
         if args.jets > ij:
             col_truth.append('from_top_'+str(ij)+'_true')
@@ -115,6 +113,7 @@ def build_and_store_df(args, files_FT):
     #print(df_alpaca.head())
     
     if not args.no_input_root:        
+        print("there's the input root file")
         #df = pd.merge(df_alpaca, df_FT, left_on=['event_number','n_jets'], right_on=['eventNumber','njets'], how='inner')
         df = pd.merge(df_alpaca, df_FT, left_on=['event_number','jet_0_round'], right_on=['eventNumber','jet_0_round'], how='inner')
         #df = pd.merge(df_alpaca, df_FT, left_on=['event_number'], right_on=['eventNumber'], how='inner')
@@ -134,6 +133,7 @@ def build_and_store_df(args, files_FT):
     #for c in df.columns:
     #    print('na in', c, df[c].isna().sum())            
     # df.to_csv(args.merged_df)
+    print("returning")
     return df
     
 
@@ -288,16 +288,15 @@ def build_tree(args):
     # 'jet_px_0', 'jet_py_0', 'jet_pz_0', 'jet_e_0' ... 'jet_e_6'
     # 'from_top_0' ... 'from_top_6'
     # 'same_as_lead_0' ... 'same_as_lead_4' 
-    # 'is_b_0' ... 'is_b_5'
     # 'from_top_0_true' ... 'from_top_6_true'
     # 'same_as_lead_0_true' ... 'same_as_lead_4_true' 
-    # 'is_b_0_true' ... 'is_b_5_true'
     '''
 
     nentries=t.GetEntries()
     #nentries=1000 # chiara: tmp test
     for ientry in progressbar.progressbar(range(nentries)):
-    # for ientry in range(5):
+    #for ientry in [1383, 1384, 1385]:
+        #print("\n\nientry", ientry)
         t.GetEntry(ientry)
         jets_all = []
         jet_vars = [
@@ -321,6 +320,14 @@ def build_tree(args):
         if args.jets > 11:
             jet_vars.append((t.jet_px_11, t.jet_py_11, t.jet_pz_11, t.jet_e_11))
 
+        # chiara: here multiply by t.scale_e (if available)
+        if t.scale_e > 0:
+            jet_vars_appo = []
+            for v in jet_vars:
+                vv = [x*t.scale_e for x in v]
+                jet_vars_appo.append(vv)
+            jet_vars = jet_vars_appo
+
         nj= len(jet_vars)
         if not nj == args.jets: 
             print('ERROR! nj == args.jets')
@@ -343,13 +350,15 @@ def build_tree(args):
             from_top.append( t.from_top_10)
         if args.jets > 11:
             from_top.append( t.from_top_11)
+        #print("from_top (original)")
+        #print(from_top)
+        #print("jet_vars")
+        #print(jet_vars)
 
-        is_b = [t.is_b_0, t.is_b_1, t.is_b_2, t.is_b_3, t.is_b_4, t.is_b_5]
         same_as_lead = [t.same_as_lead_0, t.same_as_lead_1, t.same_as_lead_2, t.same_as_lead_3, t.same_as_lead_4]
 
         import random
         from_top_random = [random.uniform(0,1) for i in range(nj)]
-        is_b_random = [random.uniform(0,1) for i in range(6)]
         same_as_lead_random = [random.uniform(0,1) for i in range(5)]
 
 
@@ -427,7 +436,7 @@ def build_tree(args):
             dR_g2 = min_max_angular_in_t(g2_list, deltaR=True)
             return dphi_g1_g2, dR_g1_g2, dphi_g1, dR_g1, dphi_g2, dR_g2 # sizes: 1, 1, 2, 2, 2, 2
 
-        def form_tops(jets_all, from_top, same_as_lead,  is_b, njets):
+        def form_tops(jets_all, from_top, same_as_lead, njets):
             #print('Number of jets:', len(jets_all))
             #print("\n\n\n")
             #print('len jets_all:',len(jets_all))            
@@ -435,7 +444,7 @@ def build_tree(args):
             from_top_appo = from_top
             #print('from_top')
             #print(from_top)
-            if not max(from_top)>0: return  0, 0, (0, 0, 0, 0, 0)
+            if not max(from_top)>0: return  0, 0, 0, 0, 0
             for iisr in range(njets-6):                
                 val, idx_isr = min((val, idx_isr) for (idx_isr, val) in enumerate(from_top_appo))
                 from_top_appo[idx_isr] = 999 # for the next iteration I don't want this to be the minimum
@@ -451,16 +460,6 @@ def build_tree(args):
             jets = [j for i,j in enumerate(jets_all) if pred_from_top[i]>0] # remove jet from ISR        
             from_top_6j = [from_top[i] for i,j in enumerate(jets_all) if pred_from_top[i]>0] # keep track of ISR score of the 6 chosen jets
             # print('Number of jets considered:', len(jets))
-            # find first b
-            val, idx_b1 = max((val, idx_b1) for (idx_b1, val) in enumerate(is_b))
-            is_b_appo = is_b.copy()
-            is_b_appo[idx_b1]=0 # put it temporary at zero to find second b
-            val, idx_b2 = max((val, idx_b2) for (idx_b2, val) in enumerate(is_b_appo))
-            pred_is_b = [0 for i in range(6)]
-            pred_is_b[idx_b1]=1
-            pred_is_b[idx_b2]=1
-
-            # print(pred_is_b)
             # print('Look at same_as_lead')
             # print("\n\n\n")
             # print("same_as_lead")
@@ -509,15 +508,30 @@ def build_tree(args):
             # dalitz variables 
             dalitz_var = form_dalitz(g1_list,g2_list) # lenght of variables: 3, 3, 1, 1, 2, 1
             angular = form_angular_var(g1_list,g2_list)
+            #print("g1")
+            #print(g1)
+            #print("g2")
+            #print(g2)
+            #print("scores")
+            #print(is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score)
+            #print("dalitz var")
+            #print(dalitz_var)
+            #print("angular")
+            #print(angular)
             return g1, g2, (is_from_top_1, is_from_top_2, sal_score_1, sal_score_2, sum_score), dalitz_var, angular
 
-        g1, g2, scores, dalitz, angular = form_tops(jets_all, from_top, same_as_lead,  is_b, args.jets)
+        g1, g2, scores, dalitz, angular = form_tops(jets_all, from_top, same_as_lead, args.jets)
+        # chiara: the last event of the file with trurh info does not appear in the file without truth info. it should be fixed but for the moment ignore that evenr
+        if g1 == 0: 
+            print("WARNING: event with zeros")
+            continue
         mg1_reco[0] = g1.M()
         mg2_reco[0] = g2.M()
         mg1g2_reco[0] = (g1+g2).M()
         pg1_reco[0] = g1.Pt()
         pg2_reco[0] = g2.Pt()
-        
+        #print("masses", mg1_reco[0], mg2_reco[0])
+
         score_is_from_tt_1[0] = scores[0]
         score_is_from_tt_2[0] = scores[1]
         score_same_as_lead_1[0] = scores[2]
@@ -549,7 +563,9 @@ def build_tree(args):
         dR_g2_min[0] = angular[5][0]
         dR_g2_max[0] = angular[5][1]
 
-        g1_random, g2_random, scores_random, dalitz_random, angular_random = form_tops(jets_all, from_top_random, same_as_lead_random,  is_b_random, args.jets)
+        #print("calling function for random")
+        g1_random, g2_random, scores_random, dalitz_random, angular_random = form_tops(jets_all, from_top_random, same_as_lead_random, args.jets)
+        #print("end calling function for random")
         mg1_random[0] = g1_random.M()
         mg2_random[0] = g2_random.M()
         mg1g2_random[0] = (g1_random + g2_random).M()
@@ -625,7 +641,6 @@ def build_tree(args):
             if args.jets > 11:
                 true_from_top.append(t.from_top_11_true)
             jets_true = [j for i,j in enumerate(jets_all) if true_from_top[i]>0] # remove jet from ISR
-            true_is_b = [t.is_b_0_true, t.is_b_1_true, t.is_b_2_true, t.is_b_3_true, t.is_b_4_true, t.is_b_5_true]
             true_same_as_lead = [t.same_as_lead_0_true, t.same_as_lead_1_true, t.same_as_lead_2_true, t.same_as_lead_3_true, t.same_as_lead_4_true]
             true_same_as_lead.insert(0,1)
             g1_list_true = [t for i,t in enumerate(jets_true) if true_same_as_lead[i]>0]
@@ -652,7 +667,9 @@ def build_tree(args):
             mg1_true[0] = g1_true.M()
             mg2_true[0] = g2_true.M()
             mg1g2_true[0] = (g1_true + g2_true).M()
-        
+
+            # the correctness of the matching is evaluated based on the resulting invariant mass.
+            # it could be changed to compare directly the resulting index 
             alpaca_good_mg1[0] = (round(mg1_true[0],2) == round(mg1_reco[0],2)) or (round(mg2_true[0],2) == round(mg1_reco[0],2))
             alpaca_good_mg2[0] = (round(mg2_true[0],2) == round(mg2_reco[0],2)) or  (round(mg1_true[0],2) == round(mg2_reco[0],2))
             alpaca_good_mg1g2[0] = (round(mg1g2_true[0],2) == round(mg1g2_reco[0],2))
@@ -701,13 +718,21 @@ def main():
 
     if 'dijet' in args.input_alpaca_truth:
         files_FT=['/eos/user/c/crizzi/RPV/ntuples/FT_merged_skim/qcd.root']
+    elif 'top' in args.input_alpaca_truth:
+        files_FT=['/eos/user/c/crizzi/RPV/ntuples/ttbar_will/output/top.root']
     else:
         files_FT=['/eos/user/c/crizzi/RPV/ntuples/FT_signal_020321_merged/mc16e/signal/504539.root']
+        files_FT=['504539.root']
+    print('chiara: file')
+    print(files_FT)
 
     if args.build_df:
         df = build_and_store_df(args, files_FT)
+        print("df")
+        print(df.shape)
         to_root(df, args.merged_df_root, key=args.output_tree)
 
+    print("done to_root")
     m1, m2 = build_tree(args)
     #df['m1_chiara'] = m1
     #df['m2_chiara'] =  m2
