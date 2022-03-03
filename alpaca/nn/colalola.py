@@ -20,8 +20,7 @@ class CoLa(torch.nn.Module):
     # Generate linear combinations of four-vectors
     # Passes on the original four-vectors followed by the combinations
     def forward(self, vectors):
-        combo = torch.cat([self.identity, self.w_combo], dim=0)
-        #from Anthony        weights = torch.cat([self.identity, torch.nn.Softmax(dim=1)(self.w_combo)], dim=0)
+        combo = torch.cat([self.identity, torch.nn.Softmax(dim=1)(self.w_combo)], dim=0)
 
 
         combvec = torch.einsum('ij,bjk->bik', combo, vectors)
