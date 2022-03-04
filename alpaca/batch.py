@@ -3,6 +3,7 @@ import logging
 import torch
 import numpy as np
 import pandas as pd
+from torch.utils.data import Dataset
 
 __all__ = ['BatchManager']
 
@@ -10,7 +11,7 @@ __all__ = ['BatchManager']
 log = logging.getLogger(__name__)
 
 
-class BatchManager:
+class BatchManager(Dataset):
 
     internal_category_name = "alpaca_category"
 
@@ -107,20 +108,8 @@ class BatchManager:
             cats = range(ncategories)
             return np.stack([df[BatchManager.internal_category_name] == c for c in cats],axis=1)
 
-    def set_valid_events(self,n):
-        self.valid_events = n
 
-    def set_valid_fraction(self,f):
-        self.valid_events = f*self.get_nr_events()
-
-    def get_valid_batch(self):
-        return self.get_torch_batch(self.valid_events)
-
-    def get_train_batch(self, i, total):
-        batchevents = self.get_nr_events()//total
-        return self.get_torch_batch(batchevents,batchevents*i+self.valid_events)
-
-    def get_torch_batch(self, N, start_index=0):
+    def __getitem__(self, idx):
         """Function that returns pytorch tensors with a batch of events,
         specifically events in the range [start_index:start_index + N].
 
@@ -134,31 +123,24 @@ class BatchManager:
 
         """
 
-        stop_index = start_index + N
-        if stop_index > self.get_nr_events():
-            log.warning('The stop index is greater than the size of the array')
-
-        #import sys
-        #np.set_printoptions(threshold=sys.maxsize)
-        #print(self._flatarrays[0:25,:].dtype)
-        #print(self._flatarrays[0:25,:])
-
-        X = torch.as_tensor(self._flatarrays[start_index:stop_index, :], dtype=torch.float)
-        Y = torch.as_tensor(self._labels[start_index:stop_index, :], dtype=torch.float)
+        X = torch.as_tensor(self._flatarrays[idx, :], dtype=torch.float)
+        Y = torch.as_tensor(self._labels[idx, :], dtype=torch.float)
         if self._spectators is not None:
-            return X, Y, self._spectators[start_index:stop_index]
+            return X, Y #, self._spectators[idx]
         else:
             return X, Y
 
     def build_flat_arrays(self):
 
         arrays = []
+        print('extras, scalars: ', self._extras, self._scalars)
+        print('shape of jets: ', self._jets.shape)
         if self._extras is not None: arrays.append(self._extras)
         if self._jets is not None: arrays.append(self._jets)
         if self._scalars is not None:  arrays.append(self._scalars)
         self._flatarrays = np.concatenate([x.reshape(x.shape[0],-1) for x in arrays],axis=1)
 
-    def get_nr_events(self):
+    def __len__(self):
         """Return the length of the internal array which holds all the events.
         """
         # self._jets and self._jetslabels should have the same length
@@ -171,7 +153,7 @@ class BatchManager:
         expected_jets = args.jets
         expected_jet_comp = 4+len(args.extra_jet_fields)
         expected_extras = args.extras
-        expected_labels = args.totaloutputs
+        expected_labels = args.totallabels
 
         obs_jets = self._jets.shape[1] if objs_njets else 0
         obs_jet_comp = self._jets.shape[2] if objs_njets else expected_jet_comp

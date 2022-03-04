@@ -1,5 +1,5 @@
 import logging
-
+import pandas
 import importlib
 import pkgutil
 from pathlib import Path
@@ -56,6 +56,8 @@ def cli():
     parser = argparse.ArgumentParser(description='ML top-like tagger.')
     sharedparser.add_argument('--debug', action='store_true', help='Debug verbosity')
     sharedparser.add_argument('--train', '-t', action='store_true', help='Run training')
+    sharedparser.add_argument('--epochs', '-e', type=int, default=1, help='Number of epochs to run')
+
     sharedparser.add_argument('--write-output', '-w', action='store_true', help='Stores the result of the evaluation on the test sample')
     sharedparser.add_argument('--output-dir', type=Path, default=Path('data'),
                         help='path to the output directory')
@@ -72,6 +74,7 @@ def cli():
     sharedparser.add_argument('--shuffle-jets', action='store_true')
     sharedparser.add_argument('--fast', action='store_true',help="Run only over sqrt(N) events for a fast test")
     sharedparser.add_argument('--test-sample', type=int, default=-1, help="How many events to use for the test sample. If running the training, the training sample is all the remaining events. If negative, use the whole sample")
+    sharedparser.add_argument('--validation-steps', type=int, default=10, help="How often (in number of training steps) the validation sample is evaluated during training.")
     sharedparser.add_argument('--label-roc', type=str, default="", help="Label added to the name of the ROC curve plots")
 
     #needed to define the NN, we need to know them to apply the NN on a sample
@@ -123,11 +126,12 @@ def cli():
         c = int(args.outputs)
         args.outputs =  [1]*c
     except ValueError:
-        args.outputs = [int(x.lower().replace("n",str(args.jets))) for x in args.outputs.split(",")]
+        args.outputs = [int(pandas.eval(x.lower().replace("n",str(args.jets)))) for x in args.outputs.split(",")]
 
     args.totaloutputs = sum(args.outputs)
     args.nscalars = len(args.scalars)
     args.nextrafields = len(args.extra_jet_fields)
+    args.totallabels = int(args.totaloutputs / args.multi_class)
 
     try:
         c = int(args.categories)
