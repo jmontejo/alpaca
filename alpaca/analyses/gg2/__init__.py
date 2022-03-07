@@ -50,8 +50,8 @@ class MainGluGlu(BaseMain):
         log.warning("No plots for MainGluGlu")
 
     def write_output(self, torch_batch, _P):
-        X,Y = torch_batch[0], torch_batch[1]
-        if len(torch_batch) > 2: spec = torch_batch[2]
+        X,Y,spec = torch_batch[0], torch_batch[1], torch_batch[2]
+
         #_P = P.data.numpy()
         _Y = Y.data.numpy()
         _X = X.data.numpy()
@@ -61,7 +61,7 @@ class MainGluGlu(BaseMain):
             jet_vars.append(extra)
         col_X = [j+'_'+str(i) for i in range(self.args.jets) for j in jet_vars]
         df_X = pd.DataFrame(data = _X, columns=col_X)
-        if len(torch_batch) > 2:
+        if spec is not None:
             for i,s in enumerate(self.args.spectators):
                 df_X[s]=spec[:,i]
         if Y.shape[1] > 1:

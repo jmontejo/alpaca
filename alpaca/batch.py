@@ -126,9 +126,12 @@ class BatchManager(Dataset):
         X = torch.as_tensor(self._flatarrays[idx, :], dtype=torch.float)
         Y = torch.as_tensor(self._labels[idx, :], dtype=torch.float)
         if self._spectators is not None:
-            return X, Y #, self._spectators[idx]
+            return X, Y# , self._spectators[idx]
         else:
             return X, Y
+
+    def get_all_with_spectators(self):
+        return self[:], self._spectators
 
     def build_flat_arrays(self):
 

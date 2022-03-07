@@ -200,12 +200,12 @@ class BaseMain:
             flatdict = {}
 
 
-        X, Y = self.bm[:]
-        _Y = Y.data.numpy()
+        (X, Y), spectators = self.bm.get_all_with_spectators()
         # Write results to file with analysis-specific function
         if args.write_output:
-            self.write_output((X,Y), _P)
+            self.write_output((X,Y,spectators), _P)
 
+        _Y = Y.data.numpy()
         if not args.no_truth: # Only for samples for which I have truth inf
             for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
                 Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
