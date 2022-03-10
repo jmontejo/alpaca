@@ -31,6 +31,7 @@ def register_cli(subparser, parentparser):
     parser.add_argument('--jet-pT-threshold', type=float, default=0.0, help='Add a threshold to jet selection.')
     parser.add_argument('--first-jet-gluino', action='store_true', help='Assume th efirst jet is a gluino jet. If true, set --outputs "N-1,5,6"')
     parser.add_argument('--multi-class', type=int, default=1, help='Use multiclass classification. If there are 3 classes, set --outputs "N,N,N"')
+    parser.add_argument('--flags-for-FSR', action='store_true', help='Gluino flags go up to 12, no longer fixed amount')
 
     # set as mutually exclusive to plan for other possibilities (e.g. divide by HT)
     scalechoice = parser.add_mutually_exclusive_group()
@@ -44,7 +45,10 @@ class MainGluGlu(BaseMain):
 
     def __init__(self, args):
         super().__init__(args)
-        self.bm = BatchManagerGluGlu(args)
+        self.bm    = BatchManagerGluGlu(args)
+        if args.input_files_qcd:
+            args.input_files = args.input_files_qcd
+            self.bmqcd = BatchManagerGluGlu(args, overwritelabels=True)
 
     def plots(self):
         log.warning("No plots for MainGluGlu")
@@ -113,6 +117,9 @@ class BatchManagerGluGlu(BatchManager):
         use_truth = not args.no_truth
         # when training I need to have and use truth label 
         if args.train: use_truth=True
+        if kwargs.get("overwritelabels",False):
+            use_truth = False
+
 
         # FIXME: pass these as arguments
         # all_partons_included = False
@@ -143,26 +150,15 @@ class BatchManagerGluGlu(BatchManager):
         #    remaining jets after the Nth there aren't any (note the minus sign)
         # - the leading jets are all existent
         #leadingNincludealltop = - df[[("partonindex", i) for i in range(jets_per_event, tot_jets_per_event)]].any(axis=1) #not "- zero_jets" this would make the last jet always ISR
-        if use_truth:
+        leadingNarenonzero = df[[("jet_e", i) for i in range(jets_per_event - zero_jets)]].all(axis=1)
+        df = df[leadingNarenonzero]
+
+        if use_truth and all_partons_included:
             if qcd_like:
                 leadingNincludealltop = (df[[("partonindex", i) for i in range(jets_per_event)]]>0).sum(1) <=2
             else:
                 leadingNincludealltop = (df[[("partonindex", i) for i in range(jets_per_event)]]>0).sum(1) ==6
-            # print('leadingNincludealltop',leadingNincludealltop.sum())
-
-            leadingNarenonzero = df[[("jet_e", i) for i in range(jets_per_event - zero_jets)]].all(axis=1)
-        #exactlyleadingNarenonzero = - df[[("jet_e", i) for i in range(jets_per_event, tot_jets_per_event)]].any(axis=1) #not "- zero_jets" this would make the last jet always ISR
-        #if all_partons_included:
-        #    df = df[leadingNincludealltop & leadingNarenonzero & exactlyleadingNarenonzero]
-        #else:
-        #    df = df[leadingNarenonzero & exactlyleadingNarenonzero]
-
-            # print('leadingNarenonzero',leadingNarenonzero.sum())
-
-            if all_partons_included:
-                df = df[leadingNincludealltop & leadingNarenonzero]
-            else:
-                df = df[leadingNarenonzero]
+            df = df[leadingNincludealltop]
 
         # The input rows have all jet px, all jet py, ... all jet partonindex
         # So segment and swap axes to group by jet
@@ -178,7 +174,7 @@ class BatchManagerGluGlu(BatchManager):
         #print([c for c in df.columns if c[0] not in args.spectators and (not 'alpaca' in c[0] and c[1]<n_jet_in_input)])
         df_jets = df[[c for c in df.columns if c[0] not in args.spectators and ('alpaca' not in c[0] and c[1]<n_jet_in_input)]]
         n_comp = 4 + len(extra_fields) # 4 ccomponents for each jet (e, px, py, pz) plus the extra components        
-        n_info_jet = n_comp if args.no_truth else n_comp+1 # if reading truth, read also parton label
+        n_info_jet = n_comp if not use_truth else n_comp+1 # if reading truth, read also parton label
         print('extra fields: ', extra_fields)
         print('ncomp: ', n_comp)
         print('n_info_jet: ', n_info_jet)
@@ -252,21 +248,31 @@ class BatchManagerGluGlu(BatchManager):
             #    return
 
             if args.multi_class > 1:
-                jetfromttbar = labels > 0
-                maskedlabels = np.ma.masked_where(jetfromttbar == False, labels)
-                nonisrlabels = maskedlabels.compressed().reshape(-1,6)
-                first_gjet_mask = nonisrlabels[:,0]<4
-                print('jetfromttbar shape: ', jetfromttbar.shape)
-                print('maskedlabels shape: ', maskedlabels.shape)
-                print('nonisrlabels shape: ', nonisrlabels.shape)
-                gjet_mask = np.tile(first_gjet_mask[:,np.newaxis],(1,jets_per_event))
-                jet_cat_mask = np.where(gjet_mask,np.logical_and(labels>0, labels<4), labels>3)
-                jetlabels = np.copy(labels)
-                jetlabels[jet_cat_mask] = 1
-                jetlabels[np.logical_and(np.logical_not(jet_cat_mask),labels!=0)] = 2
-                jetlabels.astype('int')
-                if args.first_jet_gluino:
-                    jetlabels = np.delete(jetlabels, 0, 1)
+                if args.flags_for_FSR:
+                    jetlabels = np.zeros_like(labels)
+                    firstgindex = np.expand_dims(np.argmax(labels>0, axis=1),axis=1)
+                    firstglabel = np.take_along_axis(labels,firstgindex,axis=1)
+                    first_gjet_mask = firstglabel <= 6
+                    jet_cat_mask = np.where(first_gjet_mask,np.logical_and(labels>0, labels<=6), labels>6)
+                    jetlabels[jet_cat_mask] = 1
+                    jetlabels[np.logical_and(np.logical_not(jet_cat_mask),labels!=0)] = 2
+                    jetlabels.astype('int') 
+                else:
+                    jetfromttbar = labels > 0
+                    maskedlabels = np.ma.masked_where(jetfromttbar == False, labels)
+                    nonisrlabels = maskedlabels.compressed().reshape(-1,6)
+                    first_gjet_mask = nonisrlabels[:,0]<4
+                    print('jetfromttbar shape: ', jetfromttbar.shape)
+                    print('maskedlabels shape: ', maskedlabels.shape)
+                    print('nonisrlabels shape: ', nonisrlabels.shape)
+                    gjet_mask = np.tile(first_gjet_mask[:,np.newaxis],(1,jets_per_event))
+                    jet_cat_mask = np.where(gjet_mask,np.logical_and(labels>0, labels<4), labels>3)
+                    jetlabels = np.copy(labels)
+                    jetlabels[jet_cat_mask] = 1
+                    jetlabels[np.logical_and(np.logical_not(jet_cat_mask),labels!=0)] = 2
+                    jetlabels.astype('int')
+                    if args.first_jet_gluino:
+                        jetlabels = np.delete(jetlabels, 0, 1)
 
             else:
                 # Convert the parton labels to bools that the network can make sense of
@@ -308,12 +314,13 @@ class BatchManagerGluGlu(BatchManager):
             # conform to the expectations we have for training, 6 top jets, 2 more
             # to complete top1 and 2 b-jets.
             def good_labels(r,all_partons_included):
-                if args.multi_class > 1 : 
-                    return ((r==1).sum() == (2 if args.first_jet_gluino else 3)) and \
-                        ((r==2).sum() == 3)
 
                 if not all_partons_included: return True
                 if qcd_like: return True
+
+                if args.multi_class > 1 : 
+                    return ((r==1).sum() == (2 if args.first_jet_gluino else 3)) and \
+                        ((r==2).sum() == 3)
                 
                 njets = labeledjets.shape[1]
 
@@ -344,4 +351,3 @@ class BatchManagerGluGlu(BatchManager):
             spectators_formatted = np.vstack(spectators).T if(len(args.spectators)>0) else None
             return jets,None,None, jetlabels, spectators_formatted
  
-

@@ -67,6 +67,8 @@ def cli():
     sharedparser.add_argument('--input-files', '-i', required=True, type=Path,
                         action='append',
                         help='path to the file with the input events')
+    sharedparser.add_argument('--input-files-qcd', type=Path, nargs="*",
+                        help='path to the qcd files')
     sharedparser.add_argument('--input-categories', '-ic', type=int,
                         action='append',
                         help='Category to assign to each of the input files', default=[])

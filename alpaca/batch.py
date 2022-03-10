@@ -75,6 +75,8 @@ class BatchManager(Dataset):
         self._scalars = scalars
         self._labels  = labels
         self._spectators = spectators
+        if kwargs.get("overwritelabels",False):
+            self._labels = self._spectators
 
         self.build_flat_arrays()
 

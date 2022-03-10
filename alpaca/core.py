@@ -15,7 +15,7 @@ from math import sqrt, floor
 
 from torch.utils.data import DataLoader, WeightedRandomSampler
 import numpy as np
-from alpaca.plot import get_roc_auc
+from alpaca.plot import get_roc_auc, plot_confusion_matrix, reco_gluino_mass
 
 __all__ = ['BaseMain']
 
@@ -29,7 +29,7 @@ class BaseMain:
         self.args = args
         from itertools import accumulate
         self.boundaries = list(accumulate([0]+args.outputs))
-        self.losses = {cat:[] for cat in ['total','validation']+args.categories}
+        self.losses = {cat:[] for cat in ['total','validation','signal','qcd']+args.categories}
 
 
     def get_output_dir(self):
@@ -70,14 +70,14 @@ class BaseMain:
         log.debug(self.args)
 
         log.info('Nr. of events: %s', len(self.bm))
-        self.bm.is_consistent(args)
-        log.debug('BatchManager contents is consistent')
+
 
         bmtest, bmtrain = torch.utils.data.random_split(self.bm, [test_sample, len(self.bm)-test_sample])
 
 
         if args.train:
-
+            self.bm.is_consistent(args)
+            log.debug('BatchManager contents is consistent')
             model = self.get_model(args)
             opt = torch.optim.Adam(model.parameters())
 
@@ -96,25 +96,39 @@ class BaseMain:
             #weights = 1+ 9*(Y[:,:6]==0).sum(dim=1)
             #sampler = WeightedRandomSampler(weights, len(weights))
             #loader = DataLoader(bmtrain, batch_size=batch_size, sampler=sampler)
-            loader = DataLoader(bmtrain, batch_size=batch_size)
+            loader = DataLoader(bmtrain, batch_size=batch_size )
+            __x__, normweight = self.bmqcd[:]
+            normweight = normweight.flatten()
+            loaderqcd = DataLoader(self.bmqcd, batch_size=batch_size, sampler = WeightedRandomSampler(normweight, len(normweight)))
+
+            log.info("QCD events and signal events: %d %d",len(self.bmqcd), len(bmtrain))
+            log.info("QCD batches and signal batches: %d %d",len(loaderqcd), len(loader))
 
             for epoch in range(args.epochs):
                 log.info("Epoch: %d",epoch)
-                for i, (X,Y) in enumerate(progressbar(loader)):
+                for i, ((X,Y),(Xqcd,weightqcd)) in enumerate(progressbar(zip(loader,loaderqcd))):
                     model.train()
                     opt.zero_grad()
                     
-
                     P = model(X)
                     Y = Y.reshape(-1, args.totallabels)
-                    
+                    Pqcd = model(Xqcd)
+                    Pqcd = Pqcd.reshape(Xqcd.shape[0], self.args.jets, self.args.multi_class)
+                    Pqcd_softmax = torch.nn.functional.softmax(Pqcd, dim = 2)
+                    Xqcd = Xqcd.reshape(Xqcd.shape[0], self.args.jets, 4 )
+
                     loss = {'total':0}
                     if args.multi_class > 1:
                         Y_mclass = Y.flatten().type(torch.LongTensor)
                         P_mclass = P.reshape(-1,args.multi_class)
                         criterion = torch.nn.CrossEntropyLoss()
-                        loss['total'] = criterion(P_mclass, Y_mclass)
+                        loss['signal'] = criterion(P_mclass, Y_mclass)
 
+                        qcdlambda= 1e-6
+                        qcdmass1, qcdmass2 = reco_gluino_mass(Xqcd, Pqcd_softmax)
+                        qcdloss = torch.mean((qcdmass1*qcdmass1+qcdmass2*qcdmass2)/2)*qcdlambda
+                        loss['qcd'] = qcdloss
+                        loss['total'] = (loss['signal']+loss['qcd'])/2
                     else:
                         for i,cat in enumerate(args.categories):
                             Pi = P[:,self.boundaries[i] : self.boundaries[i+1]]
@@ -207,6 +221,18 @@ class BaseMain:
 
         _Y = Y.data.numpy()
         if not args.no_truth: # Only for samples for which I have truth inf
+
+            if args.multi_class > 1:
+                shapedY = _Y.reshape(_Y.shape[0],args.jets)
+                shapedP = _P.reshape(_P.shape[0],args.multi_class,args.jets)
+                shapedP = np.swapaxes(shapedP,1,2)
+                plot_confusion_matrix(shapedY, shapedP, str(output_dir / "cm_all.png"))
+                for ijet in range(args.jets):
+                    jY = np.expand_dims(shapedY[:,ijet],axis=1)
+                    jP = np.expand_dims(shapedP[:,ijet],axis=1)
+                    plot_confusion_matrix(jY, jP, str(output_dir / "cm_jet{}.png".format(ijet)))
+
+
             for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
                 Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
                 
