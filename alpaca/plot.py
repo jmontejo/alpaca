@@ -138,7 +138,7 @@ def plot_topmatch(pred, truth, output_dir):
     plt.close()
 
 
-def reco_gluino_mass(X, P, firstJetGluino=False):
+def reco_gluino_mass(X, P, firstJetGluino=False, deterministic=False, tempfortopk=100, g1only=False):
 
     # X = X.data.numpy()
     # P = P.data.numpy()
@@ -156,7 +156,8 @@ def reco_gluino_mass(X, P, firstJetGluino=False):
     is_sublead_P = P[:,:,2]
 
     emptyjets =  X[:,:,3]==0
-    is_ISR_P[emptyjets] = 99
+    if deterministic:
+        is_ISR_P[emptyjets] = 99 #in-place change prevents gradients, can not be used for smooth
 
     jet_4p = X
     n_event = jet_4p.shape[0]
@@ -165,37 +166,37 @@ def reco_gluino_mass(X, P, firstJetGluino=False):
     n_gluino = 3
     
     # find the ISR jets
-    # Exclude jets with highest ISR score until there are 6 gluino jets left 
-    ISR_threshold, ISR_ind = torch.sort(is_ISR_P,axis=1,descending=True)
-    ISR_threshold = ISR_threshold[:,n_ISR-1,None] 
-    ISR_mask = is_ISR_P >= ISR_threshold
+    # Exclude jets with highest ISR score until there are 6 gluino jets left
+
+    v, i = torch.sort(is_ISR_P, dim=1, descending=True)
+    ISR_threshold = v[:,1]
+    ISR_mask = (is_ISR_P >= ISR_threshold[:,None]).int()
+    ISR_mask_smooth = smooth_topk(is_ISR_P, 2, temp=tempfortopk)
     if debug:
         print(is_ISR_P.shape, ISR_mask.shape, ISR_mask.shape)
         print(ISR_mask[:n])
 
     #zero out ISR jets
-    renorm_lead_P = is_lead_P/(is_lead_P+is_sublead_P)
-    jet_4p[ISR_mask] = 0
-    renorm_lead_P[ISR_mask] = 0
-    if debug:
-        print(jet_4p[:n])
-        print(renorm_lead_P[:n])
+    #renorm_lead_P = is_lead_P/(is_lead_P+is_sublead_P) #problematic with smooth approx
+    renorm_lead_P = is_lead_P
+    if deterministic:
+        renorm_lead_P = renorm_lead_P*(1-ISR_mask)
+    else:
+        renorm_lead_P = renorm_lead_P*(1-ISR_mask_smooth)
+    v, i = torch.sort(renorm_lead_P, dim=1, descending=True)
+    lead_threshold = v[:,2]
+    lead_mask = (renorm_lead_P >= lead_threshold[:,None]).int()
+    sublead_mask = 1 - lead_mask - ISR_mask
 
-    lead_threshold, lead_ind = torch.sort(renorm_lead_P,axis=1,descending=True)
-    lead_threshold = lead_threshold[:,n_gluino-1,None]
-    lead_mask = renorm_lead_P < lead_threshold
+    lead_mask_smooth = smooth_topk(renorm_lead_P, 3, ISR_mask_smooth, temp=tempfortopk)
+    sublead_mask_smooth = 1 - lead_mask_smooth - ISR_mask_smooth
 
-    if debug:
-        print(lead_threshold[:n])
-        print(lead_ind[:n])
-        print(lead_mask[:n])
-    jet_4p_lead = jet_4p.clone()
-    jet_4p_lead[lead_mask] = 0
-    jet_4p_sublead = jet_4p
-    jet_4p_sublead[torch.logical_not(lead_mask)] = 0
-    if debug:
-        print(jet_4p_lead[:n])
-        print(jet_4p_sublead[:n])
+    if deterministic:
+        jet_4p_lead = torch.mul(jet_4p,lead_mask[:,:,None])
+        jet_4p_sublead = torch.mul(jet_4p,sublead_mask[:,:,None])
+    else:   
+        jet_4p_lead = torch.mul(jet_4p,lead_mask_smooth[:,:,None])
+        jet_4p_sublead = torch.mul(jet_4p,sublead_mask_smooth[:,:,None])
 
     g1_4p = torch.sum(jet_4p_lead,axis=1)
     g2_4p = torch.sum(jet_4p_sublead,axis=1)
@@ -204,15 +205,19 @@ def reco_gluino_mass(X, P, firstJetGluino=False):
     g1_m2 = torch.square(g1_4p[:,3]) - torch.square(g1_4p[:,0]) - torch.square(g1_4p[:,1]) - torch.square(g1_4p[:,2])
     g2_m2 = torch.square(g2_4p[:,3]) - torch.square(g2_4p[:,0]) - torch.square(g2_4p[:,1]) - torch.square(g2_4p[:,2])
     
-    if torch.amin(g1_m2)< 0 or torch.amin(g2_m2)< 0:
-        print('Error: negative mass squared exists.')
-        return 0,0
-
-    if torch.isnan(torch.mean(torch.sqrt(g2_m2))):
-        nanmask = torch.isnan(g2_m2)
-        print(g2_4p[nanmask])
-        print(renorm_lead_P[nanmask])
-        sys.exit(1)
+    if torch.amin(g1_m2)< 0 or (not g1only and torch.amin(g2_m2)< 0):
+        print('Warning: negative mass squared exists.')
+        #print(torch.sum(g1_m2< 0),torch.sum(g2_m2< 0))
+        #examples = g2_m2< 0
+        #print(is_ISR_P[examples])
+        #print(is_lead_P[examples])
+        #print(is_sublead_P[examples])
+        #print(renorm_lead_P[examples])
+        #print(ISR_mask_smooth[examples])
+        #print(lead_mask_smooth[examples])
+        #print(sublead_mask_smooth[examples])
+        #print(jet_4p[examples])
+        #sys.exit(2)
     
     # # create a boolean arry of whether there is a jet at each entry
     # lead_zero_jet = lead_triplet[:,:,3] <= 0
@@ -232,5 +237,47 @@ def reco_gluino_mass(X, P, firstJetGluino=False):
     #     print('ISR score: ', is_ISR_P[torch.any(lead_zero_jet,axis=1)])
     #     print('E: ', jet_4p[torch.any(lead_zero_jet,axis=1),3])
     #     sys.exit(3)
-    
-    return torch.sqrt(g1_m2),torch.sqrt(g2_m2)
+
+    if g1only:
+        return torch.abs(g1_m2),torch.abs(g1_m2)
+
+    return torch.abs(g1_m2),torch.abs(g2_m2)
+
+def smooth_topk(tensor, k, startmask=None, axis=1, temp=100, weightsquare=False, logistic=False, logitf=10, meaninsteadofmax=False, relu=True):
+    ''' Usually topk returns the k highest elements in a tensor, which allows to build
+        a mask to only combine those jets into a mass. However this is not differentiable
+        so I pick a smooth approximation and combine all jets with almost 0-1 weights
+        From https://stats.stackexchange.com/questions/444832/is-there-something-like-softmax-but-for-top-k-values 
+        The value of temp=80 is optimized to make as strong as possible maxima without overflowing, assuming inputs are 0-1
+    '''
+
+    if startmask is not None:
+        x = startmask
+    else:
+        x = torch.zeros_like(tensor)
+
+    if meaninsteadofmax:
+        offset = torch.amax(tensor, axis, keepdim=True)
+    else:
+        offset = torch.amax(tensor, axis, keepdim=True)
+
+    exptensor = torch.exp(((tensor-offset)*temp).to(dtype=torch.float64))
+    for _ in range(k):
+        x = x + multisoftmax(exptensor,1-x, axis, temp, weightsquare, logistic, logitf)
+        if relu:
+            x = -torch.nn.functional.relu(-x + 1) + 1
+
+    if startmask is not None:
+        x = x - startmask
+    return x
+
+def multisoftmax(exptensor, w, axis, temp, weightsquare, logistic, logitf):
+    a = exptensor*w
+    weight = a/torch.sum(a, keepdim=True, axis=axis)
+    if weightsquare:
+        weight = weight*weight
+    if logistic:
+        weight = 1./(1. + torch.exp(-(weight-0.5)*logitf))
+
+    return weight
+

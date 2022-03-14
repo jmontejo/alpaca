@@ -1,8 +1,13 @@
 import logging
 import os
+import numpy as np
+np.random.seed(0)
 
 import torch
 torch.set_num_threads(1)
+torch.autograd.set_detect_anomaly(True)
+torch.manual_seed(0)
+
 from alpaca.batch import BatchManager
 from progressbar import progressbar
 
@@ -14,7 +19,6 @@ from sklearn.metrics import roc_curve, auc
 from math import sqrt, floor
 
 from torch.utils.data import DataLoader, WeightedRandomSampler
-import numpy as np
 from alpaca.plot import get_roc_auc, plot_confusion_matrix, reco_gluino_mass
 
 __all__ = ['BaseMain']
@@ -96,10 +100,11 @@ class BaseMain:
             #weights = 1+ 9*(Y[:,:6]==0).sum(dim=1)
             #sampler = WeightedRandomSampler(weights, len(weights))
             #loader = DataLoader(bmtrain, batch_size=batch_size, sampler=sampler)
-            loader = DataLoader(bmtrain, batch_size=batch_size )
+            loader = DataLoader(bmtrain, batch_size=batch_size , shuffle=True)
             __x__, normweight = self.bmqcd[:]
             normweight = normweight.flatten()
-            loaderqcd = DataLoader(self.bmqcd, batch_size=batch_size, sampler = WeightedRandomSampler(normweight, len(normweight)))
+            factor = 5
+            loaderqcd = DataLoader(self.bmqcd, batch_size=batch_size*factor, sampler = WeightedRandomSampler(normweight, factor*len(normweight)))
 
             log.info("QCD events and signal events: %d %d",len(self.bmqcd), len(bmtrain))
             log.info("QCD batches and signal batches: %d %d",len(loaderqcd), len(loader))
@@ -124,9 +129,8 @@ class BaseMain:
                         criterion = torch.nn.CrossEntropyLoss()
                         loss['signal'] = criterion(P_mclass, Y_mclass)
 
-                        qcdlambda= 1e-6
                         qcdmass1, qcdmass2 = reco_gluino_mass(Xqcd, Pqcd_softmax)
-                        qcdloss = torch.mean((qcdmass1*qcdmass1+qcdmass2*qcdmass2)/2)*qcdlambda
+                        qcdloss = torch.mean((qcdmass1+qcdmass2)/2)*args.qcd_lambda
                         loss['qcd'] = qcdloss
                         loss['total'] = (loss['signal']+loss['qcd'])/2
                     else:
@@ -185,14 +189,13 @@ class BaseMain:
             output_dir = self.get_output_dir()
             # Run for performance
             _P_list=[]
+            _P_list_formass=[]
             print('Evaluating on validation sample')
 
             batch_size = 250
             validloader = DataLoader(self.bm, batch_size=batch_size)
             for X,Y in progressbar(validloader):
-                _X = X.data.numpy()
-                _Y = Y.data.numpy()
-                actualbatch_size = _X.shape[0]
+                actualbatch_size = X.shape[0]
 
                 P_appo  = model(X)
                 # normalize _P for multiclass classification
@@ -203,6 +206,7 @@ class BaseMain:
                     else:
                         P_appo = P_appo.reshape(actualbatch_size, self.args.jets, self.args.multi_class)
                     P_softmax = torch.nn.functional.softmax(P_appo, dim = 2)
+                    _P_list_formass.append(P_softmax)
                     P_softmax = np.swapaxes(P_softmax,1,2)
                     P_softmax = P_softmax.reshape(actualbatch_size, -1)
                     _P_appo = P_softmax.data.numpy()
@@ -211,64 +215,85 @@ class BaseMain:
                 _P_list.append(_P_appo)
             #FIXME, think about many bm plots
             _P = np.vstack(_P_list)
+            _P_formass = torch.cat(_P_list_formass)
             flatdict = {}
 
 
-        (X, Y), spectators = self.bm.get_all_with_spectators()
-        # Write results to file with analysis-specific function
-        if args.write_output:
-            self.write_output((X,Y,spectators), _P)
+            (X, Y), spectators = self.bm.get_all_with_spectators()
+            # Write results to file with analysis-specific function
+            if args.write_output:
+                self.write_output((X,Y,spectators), _P)
+                X_formass = X.reshape(X.shape[0], self.args.jets, 4 )
 
-        _Y = Y.data.numpy()
-        if not args.no_truth: # Only for samples for which I have truth inf
+                g1m,g2m = reco_gluino_mass(X_formass,_P_formass,deterministic=True)
+                self.write_output_mass(np.sqrt(g1m),np.sqrt(g2m),spectators.flatten(),"signal")
 
-            if args.multi_class > 1:
-                shapedY = _Y.reshape(_Y.shape[0],args.jets)
-                shapedP = _P.reshape(_P.shape[0],args.multi_class,args.jets)
-                shapedP = np.swapaxes(shapedP,1,2)
-                plot_confusion_matrix(shapedY, shapedP, str(output_dir / "cm_all.png"))
-                for ijet in range(args.jets):
-                    jY = np.expand_dims(shapedY[:,ijet],axis=1)
-                    jP = np.expand_dims(shapedP[:,ijet],axis=1)
-                    plot_confusion_matrix(jY, jP, str(output_dir / "cm_jet{}.png".format(ijet)))
+                (Xqcd, Yqcd), specqcd = self.bmqcd.get_all_with_spectators()
+                Xqcd_formass = Xqcd.reshape(Xqcd.shape[0], self.args.jets, 4 )
+                Pqcd  = model(Xqcd)
+                Pqcd = Pqcd.reshape(Pqcd.shape[0], self.args.jets, self.args.multi_class)
+                Pqcd = torch.nn.functional.softmax(Pqcd, dim = 2)
 
+                g1m,g2m = reco_gluino_mass(Xqcd_formass,Pqcd,deterministic=True)
+                self.write_output_mass(np.sqrt(g1m),np.sqrt(g2m),specqcd.flatten(),"qcd")
 
-            for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
-                Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
-                
-                # redefine Yi
+                for temp in [10, 50, 100, 500]:
+                    tag = f"_temp{temp}"
+                    g1m,g2m = reco_gluino_mass(Xqcd_formass,Pqcd, tempfortopk=temp)
+                    self.write_output_mass(np.sqrt(g1m),np.sqrt(g2m),specqcd.flatten(),"qcd_probabilistic"+tag)
+                    g1m,g2m = reco_gluino_mass(X_formass,_P_formass, tempfortopk=temp)
+                    self.write_output_mass(np.sqrt(g1m),np.sqrt(g2m),spectators.flatten(),"signal_probabilistic"+tag)
+
+            _Y = Y.data.numpy()
+            if not args.no_truth: # Only for samples for which I have truth inf
+
                 if args.multi_class > 1:
-                    n_class = args.multi_class
-                    n_jet = args.jets
-                    Yi = np.tile(_Y,n_class)
-                    end = 0
-                    for class_i in range(n_class):
-                        start = end
-                        end = (start+n_jet-1 if args.first_jet_gluino else start+n_jet)
-                        Yi[:,start:end] = (_Y == class_i).astype('int')
-                    Yi = Yi[:,self.boundaries[i] : self.boundaries[i+1]]
-                else:
-                    Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
+                    shapedY = _Y.reshape(_Y.shape[0],args.jets)
+                    shapedP = _P.reshape(_P.shape[0],args.multi_class,args.jets)
+                    shapedP = np.swapaxes(shapedP,1,2)
+                    plot_confusion_matrix(shapedY, shapedP, str(output_dir / "cm_all.png"))
+                    for ijet in range(args.jets):
+                        jY = np.expand_dims(shapedY[:,ijet],axis=1)
+                        jP = np.expand_dims(shapedP[:,ijet],axis=1)
+                        plot_confusion_matrix(jY, jP, str(output_dir / "cm_jet{}.png".format(ijet)))
 
 
-                for ijet in range(jets):
-
-                    log.info('Plot ROC curve, category %s and output num %d'%(cat,ijet))
-                    fpr, tpr, thr = roc_curve(Yi[:,ijet], Pi[:,ijet])
-                    roc_auc = auc(fpr, tpr)
+                for i,(cat,jets) in enumerate(zip(args.categories, args.outputs)):
+                    Pi = _P[:,self.boundaries[i] : self.boundaries[i+1]]
                     
-                    fig = plt.figure()
-                    plt.plot(fpr, tpr, color='darkorange',
-                             label='ROC curve (area = {:.2f})'.format(roc_auc))
-                    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-                    plt.xlim([0.0, 1.0])
-                    plt.ylim([0.0, 1.05])
-                    plt.xlabel('False Positive Rate')
-                    plt.ylabel('True Positive Rate')
-                #plt.title('Receiver operating characteristic')
-                    plt.legend(loc="lower right")
-                    plt.savefig(str(output_dir / 'roc_curve{}_{}_{}.png'.format((len(args.label_roc)>0)*'_'+args.label_roc,cat,ijet)))
-                    plt.close()
+                    # redefine Yi
+                    if args.multi_class > 1:
+                        n_class = args.multi_class
+                        n_jet = args.jets
+                        Yi = np.tile(_Y,n_class)
+                        end = 0
+                        for class_i in range(n_class):
+                            start = end
+                            end = (start+n_jet-1 if args.first_jet_gluino else start+n_jet)
+                            Yi[:,start:end] = (_Y == class_i).astype('int')
+                        Yi = Yi[:,self.boundaries[i] : self.boundaries[i+1]]
+                    else:
+                        Yi = _Y[:,self.boundaries[i] : self.boundaries[i+1]]
+
+
+                    for ijet in range(jets):
+
+                        log.info('Plot ROC curve, category %s and output num %d'%(cat,ijet))
+                        fpr, tpr, thr = roc_curve(Yi[:,ijet], Pi[:,ijet])
+                        roc_auc = auc(fpr, tpr)
+                        
+                        fig = plt.figure()
+                        plt.plot(fpr, tpr, color='darkorange',
+                                 label='ROC curve (area = {:.2f})'.format(roc_auc))
+                        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+                        plt.xlim([0.0, 1.0])
+                        plt.ylim([0.0, 1.05])
+                        plt.xlabel('False Positive Rate')
+                        plt.ylabel('True Positive Rate')
+                    #plt.title('Receiver operating characteristic')
+                        plt.legend(loc="lower right")
+                        plt.savefig(str(output_dir / 'roc_curve{}_{}_{}.png'.format((len(args.label_roc)>0)*'_'+args.label_roc,cat,ijet)))
+                        plt.close()
 
     def write_output(self, torch_batch, P):
         ''' Writes the result into a file 

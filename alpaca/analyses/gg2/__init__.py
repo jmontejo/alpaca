@@ -28,6 +28,7 @@ def register_cli(subparser, parentparser):
                                    help='Glu Glu (Chiara version) sub-command.')
     parser.add_argument('--not-all-partons', action='store_true')
     parser.add_argument('--no-truth', action='store_true')
+    parser.add_argument('--qcd-lambda', type=float, default=0.0, help='Weight factor for qcd mass suppression')
     parser.add_argument('--jet-pT-threshold', type=float, default=0.0, help='Add a threshold to jet selection.')
     parser.add_argument('--first-jet-gluino', action='store_true', help='Assume th efirst jet is a gluino jet. If true, set --outputs "N-1,5,6"')
     parser.add_argument('--multi-class', type=int, default=1, help='Use multiclass classification. If there are 3 classes, set --outputs "N,N,N"')
@@ -52,6 +53,13 @@ class MainGluGlu(BaseMain):
 
     def plots(self):
         log.warning("No plots for MainGluGlu")
+
+    def write_output_mass(self, g1m, g2m, normweight,name):
+        data = np.stack([g1m,g2m,normweight],axis=1)
+        df = pd.DataFrame(data = data, columns=['g1m','g2m','normweight'])
+        output_dir = self.get_output_dir() 
+        output_name = output_dir / ('massoutput'+name+'.csv')
+        df.to_csv(output_name)
 
     def write_output(self, torch_batch, _P):
         X,Y,spec = torch_batch[0], torch_batch[1], torch_batch[2]
